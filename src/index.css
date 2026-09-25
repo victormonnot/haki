@@ -1,0 +1,63 @@
+@import '@fontsource-variable/manrope';
+@import '@fontsource/barlow-condensed/latin-600.css';
+
+:root {
+  font-family: 'Manrope Variable', sans-serif;
+  color: #282d29;
+  background: #f4f2ec;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --paper: #f4f2ec;
+  --ink: #282d29;
+  --muted: #6e736b;
+  --accent: #bd472c;
+  --line: #deded3;
+}
+
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+}
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+button {
+  font: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  cursor: default;
+}
+a {
+  color: inherit;
+}
+button,
+a {
+  outline-offset: 5px;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+}
+button:focus-visible {
+  outline-color: #d66949;
+}
+::selection {
+  background: #d6dfa8;
+  color: #252b23;
+}
+button svg,
+a svg {
+  flex-shrink: 0;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}

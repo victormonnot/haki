@@ -70,7 +70,7 @@ test.beforeEach(async ({ page }) => {
     })
   })
 
-  await page.goto('/')
+  await page.goto('/#guide')
 })
 
 test('runs the three phases and finishes after sixty active seconds', async ({
@@ -299,4 +299,33 @@ test('does not replay the current announcement when voices change', async ({
   expect(
     await page.evaluate(() => window.speechMock.announcements.length),
   ).toBe(1)
+})
+
+test('cancels a running audio check when navigating away', async ({ page }) => {
+  await page
+    .getByRole('button', { name: 'Lancer le test audio', exact: true })
+    .click()
+  await expect
+    .poll(() => page.evaluate(() => window.speechMock.announcements.length))
+    .toBe(1)
+  const cancellations = await page.evaluate(() => window.speechMock.cancelCount)
+
+  await page
+    .getByRole('link', { name: 'Préparer une séance', exact: true })
+    .click()
+  await expect(
+    page.getByRole('button', { name: 'Voir ma séance', exact: true }),
+  ).toBeVisible()
+  expect(
+    await page.evaluate(() => window.speechMock.cancelCount),
+  ).toBeGreaterThan(cancellations)
+  await page.clock.fastForward(60_000)
+  expect(
+    await page.evaluate(() => window.speechMock.announcements.length),
+  ).toBe(1)
+
+  await page.getByRole('link', { name: 'Tester le guide', exact: true }).click()
+  await expect(
+    page.getByRole('button', { name: 'Lancer le test audio', exact: true }),
+  ).toBeVisible()
 })

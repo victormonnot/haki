@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Compass, Headphones, Play } from 'lucide-react'
+import { Compass, Headphones, Play, NotebookPen } from 'lucide-react'
 import SoundCheckScreen from './features/sound-check/SoundCheckScreen'
 import PreparationScreen from './features/preparation/PreparationScreen'
 import WorkoutPlayer, {
@@ -7,29 +7,56 @@ import WorkoutPlayer, {
   SessionRecovery,
 } from './features/player/WorkoutPlayer'
 import { useWorkoutSession } from './features/player/useWorkoutSession'
+import HistoryScreen, {
+  ProgressTeaser,
+} from './features/progress/HistoryScreen'
+import SessionReport from './features/progress/SessionReport'
+import { useActivityHistory } from './features/progress/useActivityHistory'
 import './App.css'
 
-function currentScreen() {
-  if (window.location.hash === '#session') return 'session'
-  return ['#guide', '#sound-check'].includes(window.location.hash)
-    ? 'guide'
-    : 'preparation'
+function currentScreen(hash: string) {
+  if (hash.startsWith('#historique')) return 'history'
+  if (hash.startsWith('#bilan/')) return 'report'
+  if (hash === '#session') return 'session'
+  return ['#guide', '#sound-check'].includes(hash) ? 'guide' : 'preparation'
 }
 
 function App() {
-  const [screen, setScreen] = useState(currentScreen)
-  const previousScreen = useRef(screen)
+  const [hash, setHash] = useState(window.location.hash)
+  const screen = currentScreen(hash)
+  const previousScreen = useRef(hash)
+  const history = useActivityHistory()
+  let activityId = ''
+  try {
+    activityId = decodeURIComponent(hash.split('/').slice(1).join('/'))
+  } catch {
+    /* Invalid links show the empty state. */
+  }
   const session = useWorkoutSession(screen === 'session')
+  const finalizedDraftId =
+    !history.loading &&
+    !history.error &&
+    session.realDraft &&
+    history.activities.some((activity) => activity.id === session.realDraft?.id)
+      ? session.realDraft.id
+      : null
+  const { reconcileFinalized, busy, saving } = session
+  useEffect(() => {
+    if (finalizedDraftId && !busy && !saving) {
+      // eslint-disable-next-line react/set-state-in-effect -- Reconcile a draft finalized in another tab with persistent storage.
+      void reconcileFinalized(finalizedDraftId)
+    }
+  }, [finalizedDraftId, reconcileFinalized, busy, saving])
 
   useEffect(() => {
-    const onHashChange = () => setScreen(currentScreen())
+    const onHashChange = () => setHash(window.location.hash)
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
 
   useEffect(() => {
-    if (previousScreen.current === screen) return
-    previousScreen.current = screen
+    if (previousScreen.current === hash) return
+    previousScreen.current = hash
     const main = document.getElementById('main-content')
     main?.setAttribute('tabindex', '-1')
     main?.focus({ preventScroll: true })
@@ -38,7 +65,7 @@ function App() {
     } else {
       window.scrollTo({ top: 0, behavior: 'instant' })
     }
-  }, [screen])
+  }, [hash])
 
   return (
     <div className="app-shell">
@@ -87,6 +114,13 @@ function App() {
             <Headphones size={16} aria-hidden="true" />
             <span>Tester le guide</span>
           </a>
+          <a
+            href="#historique"
+            aria-current={screen === 'history' ? 'page' : undefined}
+          >
+            <NotebookPen size={16} aria-hidden="true" />
+            <span>Mon carnet</span>
+          </a>
           {session.draft && (
             <a
               href="#session"
@@ -100,6 +134,7 @@ function App() {
         <span className="edition">ÉDITION ORIGINE</span>
       </header>
       <div hidden={screen !== 'preparation'}>
+        <ProgressTeaser history={history} />
         <SessionRecovery session={session} />
         <SessionNotice session={session} />
         <PreparationScreen
@@ -108,6 +143,16 @@ function App() {
         />
       </div>
       {screen === 'session' && <WorkoutPlayer session={session} />}
+      {screen === 'history' && (
+        <HistoryScreen history={history} activityId={activityId} />
+      )}
+      {screen === 'report' && (
+        <SessionReport
+          history={history}
+          session={session}
+          sessionId={activityId}
+        />
+      )}
       {screen === 'guide' && <SoundCheckScreen />}
       <footer>
         <span>

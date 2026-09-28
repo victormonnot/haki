@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { FIRST_WORKOUT, MOVEMENTS } from '../../content/workouts'
+import { finalizeSession } from '../../data/activities'
+import type { Activity, PhaseResult } from '../../domain/activity'
 import {
   createSessionDraft,
   getSessionDuration,
@@ -63,6 +65,7 @@ export function useWorkoutSession(active: boolean) {
   const [busy, setBusy] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [finalizeError, setFinalizeError] = useState<string | null>(null)
   const [problem, setProblem] = useState<
     'storage' | 'conflict' | 'corrupt' | null
   >(null)
@@ -142,34 +145,41 @@ export function useWorkoutSession(active: boolean) {
     [reportFailure],
   )
 
-  const load = useCallback(async () => {
-    if (working.current) return
-    working.current = true
-    cancel()
-    await queue.current
-    setLoading(true)
-    try {
-      const stored = await loadSessionDraft()
-      revision.current = stored?.revision ?? null
-      const restored = stored ? restoreSessionDraft(stored.draft) : null
-      current.current = restored
-      real.current = restored
-      if (restored) timer.current = pausedTimer(restored)
-      setDraft(restored)
-      setRealDraft(restored)
-      setInterrupted(
-        !!restored && !['completed', 'stopped'].includes(restored.status),
-      )
-      failed.current = false
-      setError(null)
-      setProblem(null)
-    } catch (cause) {
-      reportFailure(cause)
-    } finally {
-      working.current = false
-      setLoading(false)
-    }
-  }, [cancel, reportFailure])
+  const load = useCallback(
+    async (preserveDemo = false) => {
+      if (working.current) return
+      working.current = true
+      const keepDemo = preserveDemo && current.current?.mode === 'demo'
+      if (!keepDemo) cancel()
+      await queue.current
+      setLoading(true)
+      try {
+        const stored = await loadSessionDraft()
+        revision.current = stored?.revision ?? null
+        const restored = stored ? restoreSessionDraft(stored.draft) : null
+        real.current = restored
+        setRealDraft(restored)
+        if (!keepDemo) {
+          current.current = restored
+          if (restored) timer.current = pausedTimer(restored)
+          setDraft(restored)
+          setInterrupted(
+            !!restored && !['completed', 'stopped'].includes(restored.status),
+          )
+        }
+        setFinalizeError(null)
+        failed.current = false
+        setError(null)
+        setProblem(null)
+      } catch (cause) {
+        reportFailure(cause)
+      } finally {
+        working.current = false
+        setLoading(false)
+      }
+    },
+    [cancel, reportFailure],
+  )
 
   useEffect(() => {
     // eslint-disable-next-line react/set-state-in-effect -- Hydration updates state after the asynchronous IndexedDB read.
@@ -300,6 +310,7 @@ export function useWorkoutSession(active: boolean) {
         timer.current = pausedTimer(next)
         publish(next)
         setInterrupted(false)
+        setFinalizeError(null)
         return true
       } catch (cause) {
         reportFailure(cause)
@@ -374,6 +385,7 @@ export function useWorkoutSession(active: boolean) {
       revision.current = null
       setDraft(null)
       setRealDraft(null)
+      setFinalizeError(null)
       failed.current = false
       setError(null)
       setProblem(null)
@@ -387,6 +399,57 @@ export function useWorkoutSession(active: boolean) {
       setBusy(false)
     }
   }, [cancel, pause, problem, reportFailure])
+
+  const finalize = useCallback(
+    async (phases: PhaseResult[]): Promise<Activity | null> => {
+      const source = real.current
+      if (
+        working.current ||
+        !source ||
+        !['completed', 'stopped'].includes(source.status)
+      )
+        return null
+      working.current = true
+      setBusy(true)
+      setFinalizeError(null)
+      cancel()
+      await queue.current
+      try {
+        if (failed.current || revision.current === null)
+          throw new Error('The checkpoint must be saved first.')
+        const { activity } = await finalizeSession({
+          sessionId: source.id,
+          expectedRevision: revision.current,
+          phases,
+          recordedAt: Math.max(source.updatedAt, Date.now()),
+        })
+        // The activity and draft removal have committed together before updating the UI.
+        if (current.current?.id === source.id) {
+          current.current = null
+          setDraft(null)
+        }
+        if (real.current?.id === source.id) {
+          real.current = null
+          setRealDraft(null)
+          revision.current = null
+        }
+        setError(null)
+        setProblem(null)
+        failed.current = false
+        return activity
+      } catch (cause) {
+        if (cause instanceof SessionConflictError) reportFailure(cause)
+        setFinalizeError(
+          'L’activité n’a pas pu être enregistrée. Aucune nouvelle XP n’a été confirmée. Ton bilan reste disponible pour réessayer.',
+        )
+        return null
+      } finally {
+        working.current = false
+        setBusy(false)
+      }
+    },
+    [cancel, reportFailure],
+  )
 
   const retry = useCallback(() => {
     if (!real.current) {
@@ -408,6 +471,21 @@ export function useWorkoutSession(active: boolean) {
       real.current.status === 'paused' && real.current.elapsedMs > 0,
     )
   }, [pause, publish])
+
+  const reconcileFinalized = useCallback(
+    async (id: string) => {
+      if (working.current || real.current?.id !== id) return
+      const previous = current.current
+      if (previous?.mode === 'real' && previous.status === 'running') {
+        cancel()
+        const paused = { ...previous, status: 'paused' as const }
+        timer.current = pausedTimer(paused)
+        publish(paused)
+      }
+      await load(true)
+    },
+    [cancel, load, publish],
+  )
 
   const toggleVoice = useCallback(() => {
     voice.current = !voice.current
@@ -439,6 +517,9 @@ export function useWorkoutSession(active: boolean) {
     reload: load,
     showReal,
     toggleVoice,
+    finalize,
+    finalizeError,
+    reconcileFinalized,
   }
 }
 

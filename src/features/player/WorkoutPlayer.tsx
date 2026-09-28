@@ -189,9 +189,7 @@ export function SessionRecovery({
     <aside className="session-recovery" aria-label="Séance conservée">
       <div>
         <strong>
-          {terminal
-            ? 'Ton dernier minuteur est conservé.'
-            : 'Une séance t’attend.'}
+          {terminal ? 'Ton réalisé reste à confirmer.' : 'Une séance t’attend.'}
         </strong>
         <p>
           {session.realDraft.snapshot.workoutTitle} ·{' '}
@@ -326,7 +324,7 @@ export default function WorkoutPlayer({
             {terminal
               ? demo
                 ? 'L’aperçu est terminé. Reviens à la préparation quand tu souhaites ouvrir une vraie séance.'
-                : 'Le minuteur conserve ton point d’arrêt. Le bilan du réalisé, l’historique et l’XP seront disponibles prochainement.'
+                : 'Le minuteur est arrêté. Confirme maintenant les mouvements réellement effectués pour enregistrer ton bilan dans le carnet.'
               : phase?.cue}
           </p>
           {!terminal && (
@@ -393,15 +391,14 @@ export default function WorkoutPlayer({
                 Retour à ma préparation
               </a>
             ) : (
-              <button
+              <a
                 className="primary-button"
-                disabled={session.busy || session.saving || !!session.error}
-                onClick={() => setConfirmation('discard')}
+                href={`#bilan/${encodeURIComponent(draft.id)}`}
               >
-                Préparer une nouvelle séance
-              </button>
+                Confirmer mon réalisé
+              </a>
             ))}
-          {!terminal && !demo && draft.status === 'paused' && (
+          {!demo && draft.status !== 'running' && (
             <button
               className="workout-discard"
               disabled={session.busy || session.saving || !!session.error}
@@ -527,7 +524,7 @@ export default function WorkoutPlayer({
             ? demo
               ? 'Cet aperçu sera arrêté, sans enregistrement. Tu pourras en ouvrir un nouveau depuis ta préparation.'
               : 'Le minuteur est en pause. Ton point d’arrêt sera conservé sur cet appareil ; cette séance ne pourra plus être reprise.'
-            : 'Le point de reprise et le temps chronométré de cette séance seront supprimés. Aucun historique n’est encore disponible.'}
+            : 'Ce brouillon sera supprimé sans activité ni XP. Les activités déjà enregistrées dans ton carnet seront conservées.'}
         </Confirmation>
       )}
     </main>

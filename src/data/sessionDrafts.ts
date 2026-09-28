@@ -1,5 +1,9 @@
 import { isSessionDraft, type SessionDraft } from '../domain/session'
-import { openDatabase, SESSION_DRAFTS_STORE } from './database'
+import {
+  ACTIVITIES_STORE,
+  openDatabase,
+  SESSION_DRAFTS_STORE,
+} from './database'
 
 export interface StoredSession {
   draft: SessionDraft
@@ -25,7 +29,8 @@ export class SessionDataError extends Error {
   }
 }
 
-const CURRENT_KEY = 'current'
+export const CURRENT_SESSION_KEY = 'current'
+const CURRENT_KEY = CURRENT_SESSION_KEY
 const COUNTER_KEY = 'revision-counter'
 const SCHEMA_VERSION = 1
 
@@ -37,7 +42,7 @@ function isRevision(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 }
 
-function parseStoredSession(value: unknown): StoredSession | null {
+export function parseStoredSession(value: unknown): StoredSession | null {
   if (value === undefined) return null
   if (
     !isRecord(value) ||
@@ -66,6 +71,25 @@ function parseCounter(value: unknown, current: StoredSession | null): number {
     )
   }
   return value.revision
+}
+
+export function parseSessionStorage(records: unknown[]): StoredSession | null {
+  let current: unknown
+  let counter: unknown
+  for (const record of records) {
+    if (!isRecord(record))
+      throw new Error('Le stockage de la séance est invalide.')
+    if (record.id === CURRENT_KEY && current === undefined) current = record
+    else if (record.id === COUNTER_KEY && counter === undefined)
+      counter = record
+    else
+      throw new Error(
+        'Le stockage de la séance contient un enregistrement inconnu.',
+      )
+  }
+  const stored = parseStoredSession(current)
+  parseCounter(counter, stored)
+  return stored
 }
 
 function assertExpectedRevision(
@@ -131,12 +155,15 @@ export async function saveSessionDraft(
   try {
     return await new Promise((resolve, reject) => {
       const transaction = database.transaction(
-        SESSION_DRAFTS_STORE,
+        [SESSION_DRAFTS_STORE, ACTIVITIES_STORE],
         'readwrite',
       )
       const store = transaction.objectStore(SESSION_DRAFTS_STORE)
       const currentRequest = store.get(CURRENT_KEY)
       const counterRequest = store.get(COUNTER_KEY)
+      const activityRequest = transaction
+        .objectStore(ACTIVITIES_STORE)
+        .get(snapshot.id)
       let result: StoredSession
       let failure: unknown
 
@@ -150,8 +177,10 @@ export async function saveSessionDraft(
       }
       transaction.oncomplete = () => resolve(result)
       // Requests in one transaction run in order; this callback can still write atomically.
-      counterRequest.onsuccess = () => {
+      activityRequest.onsuccess = () => {
         try {
+          if (activityRequest.result !== undefined)
+            throw new SessionConflictError()
           const current = parseStoredSession(currentRequest.result)
           assertExpectedRevision(current, expectedRevision)
           if (current && current.draft.id !== snapshot.id)

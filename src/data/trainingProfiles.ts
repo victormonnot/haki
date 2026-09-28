@@ -77,6 +77,19 @@ function isStoredProfile(
   )
 }
 
+export function parseStoredTrainingProfile(value: unknown): TrainingProfile {
+  const id =
+    typeof value === 'object' && value !== null && 'id' in value
+      ? value.id
+      : undefined
+  if ((id !== 'home' && id !== 'gym') || !isStoredProfile(value, id)) {
+    throw new Error(
+      'Un profil enregistré est invalide. L’export a été interrompu.',
+    )
+  }
+  return copyProfile(value)
+}
+
 export async function loadTrainingProfiles(): Promise<{
   profiles: Record<ProfileId, TrainingProfile>
   invalidProfileIds: ProfileId[]

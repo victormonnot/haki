@@ -398,9 +398,10 @@ test('pauses on navigation and can stop while preserving the measured time', asy
     () => window.playerSpeechMock.cancelCount,
   )
   await page.getByRole('link', { name: 'Ma préparation', exact: true }).click()
-  expect(
-    await page.evaluate(() => window.playerSpeechMock.cancelCount),
-  ).toBeGreaterThan(cancellations)
+  // hashchange is asynchronous; wait for its pause before advancing the fake clock.
+  await expect
+    .poll(() => page.evaluate(() => window.playerSpeechMock.cancelCount))
+    .toBeGreaterThan(cancellations)
   await page.clock.fastForward(60_000)
   await page.getByRole('link', { name: /Retrouver ma séance/ }).click()
   await expect(

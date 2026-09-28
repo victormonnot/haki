@@ -6,7 +6,7 @@ HAKI permet de préparer **L’Éveil du Nord**, une première séance du parcou
 
 Les profils **Maison** et **Salle de boxe** sont modifiables et enregistrables sur l’appareil. Un test audio séparé de **60 secondes** permet d’essayer la voix française, le chronomètre et les interruptions, écran déverrouillé. Le maintien de l’écran allumé est demandé lorsque le navigateur le permet.
 
-Le lecteur guide chaque étape, affiche les temps restants et permet de mettre en pause, reprendre ou arrêter. Le brouillon réel est conservé sur cet appareil, y compris son contenu et son point d’arrêt. L’historique, le bilan du réalisé et l’XP ne sont pas encore disponibles. L’installation en PWA et le fonctionnement hors connexion ne sont pas pris en charge.
+Le lecteur guide chaque étape, affiche les temps restants et permet de mettre en pause, reprendre ou arrêter. Le brouillon réel est conservé sur cet appareil, y compris son contenu et son point d’arrêt. Le bilan permet de confirmer les blocs réellement effectués, puis de conserver la séance complète ou partielle dans un carnet avec XP générale et répartition entre les quatre voies. Un export JSON permet de sauvegarder les données locales. L’installation en PWA et le fonctionnement hors connexion ne sont pas pris en charge.
 
 ## Démarrer
 
@@ -67,25 +67,48 @@ Les profils utilisent IndexedDB dans le navigateur courant. Ils ne sont pas sync
 1. Préparer une variante compatible, ouvrir « Voir ma séance », puis « Ouvrir le lecteur ». Le lecteur enregistre le brouillon avant de proposer le départ.
 2. Appuyer sur « Démarrer la séance ». Chaque étape possède son chronomètre et sa consigne vocale. Essayer pause/reprise et la désactivation de la voix.
 3. Changer d’application ou revenir à la préparation : le lecteur se met en pause. Au retour, reprendre explicitement. Recharger la page restaure le dernier point enregistré, sans compter le temps écoulé depuis sa sauvegarde.
-4. « Arrêter » demande confirmation et conserve le point d’arrêt. À la fin du minuteur, aucun effort n’est déclaré automatiquement. Le brouillon reste consultable ; en préparer un nouveau demande de supprimer explicitement le précédent.
+4. « Arrêter » demande confirmation et conserve le point d’arrêt. À la fin du minuteur, aucun effort n’est déclaré automatiquement. Le brouillon reste consultable jusqu’à la confirmation du bilan, ou sa suppression explicite sans activité ni XP.
 5. Pour parcourir rapidement les transitions, choisir « Essayer en accéléré ». Chaque étape dure cinq secondes, sans exercice à faire. Cet aperçu reste en mémoire uniquement, disparaît au rechargement et ne modifie pas le brouillon réel.
 
 Le lecteur enregistre un point de reprise environ chaque seconde ainsi qu’aux changements d’étape et d’état. Une fermeture brutale peut perdre le temps depuis le dernier enregistrement réussi. Une suspension des callbacks supérieure à cinq secondes provoque également une pause au dernier temps observé. Le temps repose sur une horloge monotone ; les retards de rendu courts ne s’accumulent pas.
 
 Un échec de sauvegarde met la séance en pause et propose une nouvelle tentative. Les écritures vérifient la révision enregistrée : deux onglets ne peuvent pas remplacer silencieusement leurs points de reprise. En cas de conflit, charger le dernier point enregistré. Utiliser un seul onglet pour s’entraîner.
 
-La migration du stockage conserve les profils existants. Les données restent propres au navigateur et à l’adresse utilisée ; effacer les données du site supprime aussi le brouillon. Aucun export ni historique n’est encore disponible. Les annonces audio sont simulées dans les tests automatisés : la voix réelle et le maintien de l’écran doivent être vérifiés sur iPhone.
+La migration du stockage conserve les profils existants. Les données restent propres au navigateur et à l’adresse utilisée ; effacer les données du site supprime aussi le brouillon. Le carnet et l’export sont accessibles depuis « Mon carnet ». Les annonces audio sont simulées dans les tests automatisés : la voix réelle et le maintien de l’écran doivent être vérifiés sur iPhone.
+
+## Confirmer le réalisé et suivre sa progression
+
+1. Après la fin du minuteur ou un arrêt confirmé, choisir « Confirmer mon réalisé ».
+2. Cocher les blocs effectivement réalisés. Rien n’est coché automatiquement. Pour une séance suivie entièrement, « Confirmer tous les blocs chronométrés » permet de sélectionner les durées proposées en une action explicite.
+3. Ajuster les durées en secondes si nécessaire, dans la limite du temps chronométré de chaque bloc. Les blocs non atteints et les récupérations ne peuvent pas être déclarés comme du mouvement.
+4. Vérifier le statut complet ou partiel et l’XP proposée, puis « Confirmer et enregistrer ». Les choix du formulaire ne sont pas enregistrés avant cette confirmation ; un rechargement avant validation demande de les saisir à nouveau.
+5. Retrouver le bilan et la progression dans « Mon carnet ». Recharger la page ou revisiter un bilan enregistré n’ajoute pas une seconde activité.
+
+Le barème actuel est versionné : **10 XP par minute de mouvement confirmé**, échauffement et retour au calme compris, arrondies à l’entier inférieur sur le total. Les récupérations, pauses et interruptions ne produisent pas d’XP. Le total est réparti selon les poids de la variante par la méthode des plus forts restes ; les égalités suivent l’ordre Puissant, Infatigable, Technicien, Stratège. La somme des voies est exactement égale à l’XP générale.
+
+Une séance est complète seulement si le minuteur est terminé et si tous les blocs de mouvement sont confirmés en entier. Toute autre déclaration valide reste partielle. Une déclaration d’une à cinq secondes peut être conservée avec 0 XP. Les niveaux commencent à 1 et progressent tous les 100 XP, sans perte liée à l’inactivité.
+
+Exemple : **Fondations**, confirmée en entier, représente 12 minutes chronométrées dont 10 minutes de mouvement. Elle rapporte **100 XP**, réparties en 35 au Puissant, 30 à l’Infatigable et 35 au Technicien. Le Stratège reste à 0, car cette variante ne contient pas de travail de réaction ou de décision.
+
+L’activité contient l’instantané de la séance, le réalisé et sa récompense. Son identifiant correspond à celui de l’exécution : la transaction ajoute l’activité et retire le brouillon ensemble. Une double soumission retrouve l’activité existante. Les totaux sont dérivés de l’historique ; aucun compteur d’XP indépendant n’est modifié. En cas d’échec, aucune réussite n’est annoncée et le brouillon reste disponible pour réessayer. Une activité finalisée dans un autre onglet est reconnue au retour au premier plan.
+
+## Exporter les données
+
+« Mon carnet → Exporter mes données » prépare un fichier `haki-YYYY-MM-DD.json`. Le format `haki-backup`, version 1, inclut les activités, les profils effectivement enregistrés et le brouillon réel éventuel, lus dans une même transaction. Une donnée illisible bloque l’export au lieu de produire une sauvegarde silencieusement incomplète.
+
+L’aperçu accéléré n’ajoute ni activité ni XP et n’apparaît jamais dans l’export. L’import, la modification et la suppression des activités, le calendrier, les cours ajoutés manuellement et les déblocages de l’arbre ne sont pas encore disponibles. Conserver les fichiers exportés avant de vider les données du navigateur.
 
 ## Organisation
 
 - `src/content` : séance, variantes, phases et mouvements.
-- `src/domain` : compatibilité, chronomètre et instantanés de séance, indépendants de l’interface.
-- `src/data` : profils et brouillon local, migrations, validation et transactions IndexedDB.
+- `src/domain` : compatibilité, chronomètre, instantanés de séance, validation du réalisé et règles d’XP, indépendants de l’interface.
+- `src/data` : profils, brouillon et activités, migrations, transactions IndexedDB et export cohérent.
 - `src/features/preparation` : configuration, choix de variante et aperçu détaillé.
 - `src/features/sound-check` : essai de guidage audio et adaptateurs voix/écran.
 - `src/features/player` : lecteur, interruptions et points de reprise.
+- `src/features/progress` : bilan déclaré, carnet, progression et téléchargement de l’export.
 
-Les durées affichées sont calculées à partir des phases, échauffement et récupérations compris. Les pourcentages des voies décrivent l’orientation du contenu ; ils ne mesurent pas les capacités de la personne et ne constituent pas une attribution d’XP.
+Les durées affichées sont calculées à partir des phases, échauffement et récupérations compris. Les pourcentages des voies décrivent l’orientation du contenu ; ils déterminent la répartition de l’XP confirmée, sans mesurer les capacités de la personne.
 
 ## Contenu d’entraînement
 

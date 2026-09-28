@@ -109,9 +109,10 @@ describe('session draft persistence', () => {
       (await loadTrainingProfiles()).profiles.gym.setup.availableMinutes,
     ).toBe(20)
     const database = await openDatabase()
-    expect(database.version).toBe(3)
+    expect(database.version).toBe(4)
     expect([...database.objectStoreNames]).toEqual([
       'activities',
+      'activity-deletions',
       'session-drafts',
       'training-profiles',
     ])

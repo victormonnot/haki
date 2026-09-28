@@ -16,14 +16,52 @@ import HistoryScreen, {
 } from './features/progress/HistoryScreen'
 import SessionReport from './features/progress/SessionReport'
 import { useActivityHistory } from './features/progress/useActivityHistory'
+import ActivityEditor from './features/progress/ActivityEditor'
+import type { ActivityHistoryController } from './features/progress/useActivityHistory'
+import type { Activity } from './domain/activity'
 import './App.css'
 
 function currentScreen(hash: string) {
+  if (hash.startsWith('#activite/')) return 'editor'
   if (hash === '#parcours') return 'path'
   if (hash.startsWith('#historique')) return 'history'
   if (hash.startsWith('#bilan/')) return 'report'
   if (hash === '#session') return 'session'
   return ['#guide', '#sound-check'].includes(hash) ? 'guide' : 'preparation'
+}
+
+function EditActivityRoute({
+  id,
+  history,
+}: {
+  id: string
+  history: ActivityHistoryController
+}) {
+  const found = history.activities.find((item) => item.id === id)
+  const [initial, setInitial] = useState<Activity | undefined>(found)
+  // Keep the editing baseline when another tab refreshes or removes this activity.
+  if (!initial && found) setInitial(found)
+  if (initial) return <ActivityEditor activity={initial} history={history} />
+  return (
+    <main id="main-content" tabIndex={-1} className="progress-screen">
+      {history.loading ? (
+        <p role="status">Chargement de l’activité…</p>
+      ) : history.error ? (
+        <>
+          <p role="alert">{history.error}</p>
+          <button onClick={() => void history.refresh()}>Réessayer</button>
+        </>
+      ) : (
+        <>
+          <h1>Activité introuvable.</h1>
+          <p>Cette activité n’est plus disponible dans le carnet.</p>
+        </>
+      )}
+      <a className="progress-link" href="#historique">
+        Revenir au carnet
+      </a>
+    </main>
+  )
 }
 
 function workoutIdFromHash(hash: string) {
@@ -50,7 +88,11 @@ function App() {
   )
   let activityId = ''
   try {
-    activityId = decodeURIComponent(hash.split('/').slice(1).join('/'))
+    activityId = decodeURIComponent(
+      hash.startsWith('#activite/modifier/')
+        ? hash.slice('#activite/modifier/'.length)
+        : hash.split('/').slice(1).join('/'),
+    )
   } catch {
     /* Invalid links show the empty state. */
   }
@@ -59,7 +101,12 @@ function App() {
     !history.loading &&
     !history.error &&
     session.realDraft &&
-    history.activities.some((activity) => activity.id === session.realDraft?.id)
+    (history.activities.some(
+      (activity) => activity.id === session.realDraft?.id,
+    ) ||
+      history.deletedActivities.some(
+        (activity) => activity.id === session.realDraft?.id,
+      ))
       ? session.realDraft.id
       : null
   const { reconcileFinalized, busy, saving } = session
@@ -153,7 +200,9 @@ function App() {
           </a>
           <a
             href="#historique"
-            aria-current={screen === 'history' ? 'page' : undefined}
+            aria-current={
+              screen === 'history' || screen === 'editor' ? 'page' : undefined
+            }
           >
             <NotebookPen size={16} aria-hidden="true" />
             <span>Mon carnet</span>
@@ -201,6 +250,16 @@ function App() {
       {screen === 'history' && (
         <HistoryScreen history={history} activityId={activityId} />
       )}
+      {screen === 'editor' &&
+        (hash === '#activite/nouvelle' ? (
+          <ActivityEditor key="new" history={history} />
+        ) : (
+          <EditActivityRoute
+            key={activityId}
+            id={activityId}
+            history={history}
+          />
+        ))}
       {screen === 'report' && (
         <SessionReport
           history={history}

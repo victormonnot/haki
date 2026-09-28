@@ -1,6 +1,7 @@
 import { isSessionDraft, type SessionDraft } from '../domain/session'
 import {
   ACTIVITIES_STORE,
+  ACTIVITY_DELETIONS_STORE,
   openDatabase,
   SESSION_DRAFTS_STORE,
 } from './database'
@@ -155,7 +156,7 @@ export async function saveSessionDraft(
   try {
     return await new Promise((resolve, reject) => {
       const transaction = database.transaction(
-        [SESSION_DRAFTS_STORE, ACTIVITIES_STORE],
+        [SESSION_DRAFTS_STORE, ACTIVITIES_STORE, ACTIVITY_DELETIONS_STORE],
         'readwrite',
       )
       const store = transaction.objectStore(SESSION_DRAFTS_STORE)
@@ -163,6 +164,9 @@ export async function saveSessionDraft(
       const counterRequest = store.get(COUNTER_KEY)
       const activityRequest = transaction
         .objectStore(ACTIVITIES_STORE)
+        .get(snapshot.id)
+      const deletionRequest = transaction
+        .objectStore(ACTIVITY_DELETIONS_STORE)
         .get(snapshot.id)
       let result: StoredSession
       let failure: unknown
@@ -177,9 +181,12 @@ export async function saveSessionDraft(
       }
       transaction.oncomplete = () => resolve(result)
       // Requests in one transaction run in order; this callback can still write atomically.
-      activityRequest.onsuccess = () => {
+      deletionRequest.onsuccess = () => {
         try {
-          if (activityRequest.result !== undefined)
+          if (
+            activityRequest.result !== undefined ||
+            deletionRequest.result !== undefined
+          )
             throw new SessionConflictError()
           const current = parseStoredSession(currentRequest.result)
           assertExpectedRevision(current, expectedRevision)

@@ -8,9 +8,11 @@ import {
 } from '../content/workouts'
 import {
   createActivity,
+  createManualActivity,
+  amendGuidedActivity,
   getReportablePhases,
   isActivity,
-  type Activity,
+  type GuidedActivity,
 } from './activity'
 import { createSessionDraft, getSessionDuration } from './session'
 import {
@@ -37,7 +39,7 @@ function completion(
     stopped?: boolean
     id?: string
   } = {},
-): Activity {
+): GuidedActivity {
   const rule = VIKING_PATH.nodes.find(({ id }) => id === workoutId)
     ?.acceptedCompletions[0]
   const variant = {
@@ -79,11 +81,59 @@ function completion(
   return createActivity(session, results, 3_000)
 }
 
-function completedNodes(ids: readonly string[]): Activity[] {
+function completedNodes(ids: readonly string[]): GuidedActivity[] {
   return ids.map((id) => completion(id))
 }
 
 describe('derivePathProgress', () => {
+  it('never validates a Viking step from a real manual activity, regardless of its title or paths', () => {
+    const now = Date.UTC(2026, 8, 28)
+    const activity = createManualActivity(
+      {
+        id: ROOT,
+        title: FIRST_WORKOUT.title,
+        occurredAt: now,
+        durationSeconds: 720,
+        pathIds: ['power', 'endurance', 'technique', 'strategy'],
+        notes: '',
+      },
+      now,
+    )
+    expect(isActivity(activity)).toBe(true)
+    expect(derivePathProgress(VIKING_PATH, [activity])).toMatchObject({
+      completedCount: 0,
+      accessibleCount: 1,
+    })
+  })
+
+  it('recomputes access after amending a stored guided completion without erasing later achievements', () => {
+    const now = Date.UTC(2026, 8, 28)
+    const all = completedNodes(VIKING_PATH.nodes.map(({ id }) => id))
+    const root = all[0]
+    const phases = structuredClone(root.result.phases)
+    phases[0].performedSeconds = 0
+    const edited = amendGuidedActivity(
+      root,
+      { phases, occurredAt: now, notes: 'Échauffement non réalisé.' },
+      now,
+    )
+    const progress = derivePathProgress(VIKING_PATH, [edited, ...all.slice(1)])
+    expect(progress).toMatchObject({ completedCount: 5, accessibleCount: 1 })
+    expect(getPathNodeProgress(progress, FINISH)).toMatchObject({
+      completed: true,
+      accessible: false,
+      missingPrerequisiteIds: [ROOT],
+    })
+    const restored = amendGuidedActivity(
+      edited,
+      { phases: root.result.phases, occurredAt: now, notes: '' },
+      now + 1,
+    )
+    expect(
+      derivePathProgress(VIKING_PATH, [restored, ...all.slice(1)]),
+    ).toMatchObject({ completedCount: 6, accessibleCount: 6 })
+  })
+
   it('starts with one accessible root and no achievements', () => {
     const progress = derivePathProgress(VIKING_PATH, [])
 

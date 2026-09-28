@@ -591,7 +591,7 @@ test('records a new workout with phase-based XP and preserves it in the export',
   const backup = JSON.parse(await readFile(file!, 'utf8'))
   expect(backup).toMatchObject({
     format: 'haki-backup',
-    version: 1,
+    version: 2,
     session: null,
   })
   expect(backup.activities).toHaveLength(2)

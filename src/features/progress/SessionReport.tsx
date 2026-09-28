@@ -241,8 +241,8 @@ function ReportForm({
                 : 'Confirmer et enregistrer'}
           </button>
           <p className="progress-help">
-            Ce bilan devient une activité dans ton carnet. Les modifications
-            d’activités seront disponibles dans une prochaine version.
+            Ce bilan devient une activité dans ton carnet. Tu pourras y corriger
+            le réalisé, sa date et tes notes.
           </p>
         </aside>
       </form>

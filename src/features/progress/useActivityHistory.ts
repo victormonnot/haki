@@ -1,9 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { listActivities } from '../../data/activities'
+import {
+  loadActivityHistory,
+  type ActivityDeletion,
+} from '../../data/activities'
 import type { Activity } from '../../domain/activity'
 
 export function useActivityHistory() {
   const [activities, setActivities] = useState<Activity[]>([])
+  const [deletedActivities, setDeletedActivities] = useState<
+    ActivityDeletion[]
+  >([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const request = useRef(0)
@@ -12,9 +18,10 @@ export function useActivityHistory() {
     const current = ++request.current
     setLoading(true)
     try {
-      const saved = await listActivities()
+      const saved = await loadActivityHistory()
       if (current !== request.current) return
-      setActivities(saved)
+      setActivities(saved.activities)
+      setDeletedActivities(saved.deletedActivities)
       setError(null)
     } catch {
       if (current !== request.current) return
@@ -34,7 +41,9 @@ export function useActivityHistory() {
     }
     const onNavigate = () => {
       if (
-        /^#(?:historique|bilan|parcours|preparation)/.test(window.location.hash)
+        /^#(?:historique|bilan|parcours|preparation|activite)/.test(
+          window.location.hash,
+        )
       )
         void refresh()
     }
@@ -49,6 +58,6 @@ export function useActivityHistory() {
     }
   }, [refresh])
 
-  return { activities, loading, error, refresh }
+  return { activities, deletedActivities, loading, error, refresh }
 }
 export type ActivityHistoryController = ReturnType<typeof useActivityHistory>

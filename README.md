@@ -6,7 +6,7 @@ HAKI propose **L’appel du Nord**, un parcours Viking de six séances et treize
 
 Les profils **Maison** et **Salle de boxe** sont modifiables et enregistrables sur l’appareil. Un test audio séparé de **60 secondes** permet d’essayer la voix française, le chronomètre et les interruptions, écran déverrouillé. Le maintien de l’écran allumé est demandé lorsque le navigateur le permet.
 
-Le lecteur guide chaque étape, affiche les temps restants et permet de mettre en pause, reprendre ou arrêter. Le brouillon réel est conservé sur cet appareil, y compris son contenu et son point d’arrêt. Le bilan permet de confirmer les blocs réellement effectués, puis de conserver la séance complète ou partielle dans un carnet avec XP générale et répartition entre les quatre voies. Un export JSON permet de sauvegarder les données locales. L’installation en PWA et le fonctionnement hors connexion ne sont pas pris en charge.
+Le lecteur guide chaque étape, affiche les temps restants et permet de mettre en pause, reprendre ou arrêter. Le brouillon réel est conservé sur cet appareil, y compris son contenu et son point d’arrêt. Le bilan permet de confirmer les blocs réellement effectués, puis de conserver la séance complète ou partielle dans un carnet avec XP générale et répartition entre les quatre voies. Le carnet propose un calendrier, l’ajout d’entraînements personnels ou en club, ainsi que la correction et la suppression des bilans. Un export JSON permet de sauvegarder les données locales. L’installation en PWA et le fonctionnement hors connexion ne sont pas pris en charge.
 
 ## Démarrer
 
@@ -111,22 +111,40 @@ Exemple : **Fondations**, confirmée en entier, représente 12 minutes chronomé
 
 L’activité contient l’instantané de la séance, le réalisé et sa récompense. Son identifiant correspond à celui de l’exécution : la transaction ajoute l’activité et retire le brouillon ensemble. Une double soumission retrouve l’activité existante. Les totaux sont dérivés de l’historique ; aucun compteur d’XP indépendant n’est modifié. En cas d’échec, aucune réussite n’est annoncée et le brouillon reste disponible pour réessayer. Une activité finalisée dans un autre onglet est reconnue au retour au premier plan.
 
+## Tenir le carnet
+
+Depuis « Mon carnet », choisir **Ajouter un entraînement** pour noter un cours, une sortie ou une pratique personnelle :
+
+1. Donner un nom, une date et une heure locales, puis une durée de pratique de 1 à 180 minutes entières, pauses exclues.
+2. Sélectionner les voies réellement travaillées. Aucune voie n’est présélectionnée ; le Stratège correspond à un travail de décision ou de réponse à des signaux.
+3. Ajouter éventuellement des notes, vérifier l’XP proposée, puis enregistrer. Le formulaire n’est pas conservé après avoir quitté la page ou l’avoir rechargée.
+
+Le barème manuel, version 3, attribue **10 XP par minute déclarée**, partagées à parts égales entre les voies sélectionnées. Les unités restantes suivent l’ordre Puissant, Infatigable, Technicien, Stratège. Par exemple, 45 minutes réparties entre endurance et technique donnent 450 XP générales, soit 225 XP pour chaque voie. Une activité ajoutée au carnet ne valide aucune étape Viking.
+
+Le calendrier commence le lundi. Il affiche le nombre d’entraînements et le temps de pratique déclaré pour la semaine en cours et le mois affiché. Une séance guidée partielle compte comme une activité avec sa durée réellement confirmée. Choisir un jour filtre la liste ; « Tout le carnet » retrouve l’ensemble de l’historique, trié par date de pratique. Les heures sont affichées dans le fuseau de l’appareil, et les semaines sont calculées à partir des jours locaux, y compris lors des changements d’heure. La saisie manuelle accepte des dates passées à partir du 1er janvier 2000 ; une heure inexistante lors d’un changement d’heure est refusée.
+
+Dans le détail d’une activité, **Modifier cette activité** permet de corriger la date et les notes. Pour un entraînement manuel, le titre, la durée et les voies sont modifiables ; pour une séance guidée, les durées restent bornées par le chronomètre d’origine. L’instantané du contenu et son barème sont conservés. Le nouveau bilan remplace l’ancien, sans ajouter une seconde activité ni cumuler les deux récompenses.
+
+**Supprimer cette activité** demande une confirmation explicite. Les XP et les déblocages sont recalculés depuis les activités restantes. Retirer ou rendre partiel un prérequis peut verrouiller les séances suivantes ; leurs activités déjà enregistrées restent conservées.
+
+Les écritures vérifient la révision du bilan. Une modification concurrente entraîne un conflit et conserve la saisie locale jusqu’au rechargement volontaire de la version enregistrée. La suppression conserve uniquement l’identifiant, la révision et la date de suppression pour empêcher un ancien onglet de recréer l’activité ; le contenu et les notes sont retirés. La migration du stockage préserve les profils, les brouillons et les activités guidées existantes.
+
 ## Exporter les données
 
-« Mon carnet → Exporter mes données » prépare un fichier `haki-YYYY-MM-DD.json`. Le format `haki-backup`, version 1, inclut les activités, les profils effectivement enregistrés et le brouillon réel éventuel, lus dans une même transaction. Une donnée illisible bloque l’export au lieu de produire une sauvegarde silencieusement incomplète.
+« Mon carnet → Exporter mes données » prépare un fichier `haki-YYYY-MM-DD.json`. Le format `haki-backup`, version 2, inclut les activités guidées et manuelles, les profils effectivement enregistrés, le brouillon réel éventuel et les identifiants des activités supprimées (`deletedActivities`), lus dans une même transaction. Chaque suppression contient son identifiant, sa révision et sa date, sans le contenu de l’activité. Une donnée illisible bloque l’export au lieu de produire une sauvegarde silencieusement incomplète.
 
-L’aperçu accéléré n’ajoute ni activité ni XP et n’apparaît jamais dans l’export. L’import, la modification et la suppression des activités, le calendrier et les cours ajoutés manuellement ne sont pas encore disponibles. Conserver les fichiers exportés avant de vider les données du navigateur.
+L’aperçu accéléré n’ajoute ni activité ni XP et n’apparaît jamais dans l’export. L’import et la réinitialisation complète ne sont pas encore disponibles. Conserver les fichiers exportés avant de vider les données du navigateur.
 
 ## Organisation
 
 - `src/content` : catalogue des séances, variantes, phases, mouvements et parcours Viking.
-- `src/domain` : compatibilité, chronomètre, instantanés de séance, validation du réalisé et règles d’XP, indépendants de l’interface.
-- `src/data` : profils, brouillon et activités, migrations, transactions IndexedDB et export cohérent.
+- `src/domain` : compatibilité, chronomètre, instantanés de séance, validation du réalisé, activités manuelles, corrections, dates locales et règles d’XP, indépendants de l’interface.
+- `src/data` : profils, brouillon et activités, migrations, transactions IndexedDB, révisions, protection des suppressions et export cohérent.
 - `src/features/path` : arbre Viking, prérequis, états d’accès et de validation.
 - `src/features/preparation` : configuration, choix de variante et aperçu détaillé.
 - `src/features/sound-check` : essai de guidage audio et adaptateurs voix/écran.
 - `src/features/player` : lecteur, interruptions et points de reprise.
-- `src/features/progress` : bilan déclaré, carnet, progression et téléchargement de l’export.
+- `src/features/progress` : bilan déclaré, calendrier, édition des activités, progression et téléchargement de l’export.
 
 Les durées affichées sont calculées à partir des phases, échauffement et récupérations compris. Les pourcentages des voies décrivent l’orientation du contenu ; ils représentent la séance complète. Pour les contenus au barème 2, un bilan partiel utilise uniquement l’orientation des blocs confirmés. Ces valeurs ne mesurent pas les capacités de la personne.
 

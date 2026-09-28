@@ -3,6 +3,10 @@ import {
   getProgress,
   PATHS,
   REWARD_POLICY_V1,
+  getActivityDate,
+  getActivityNotes,
+  getActivityRevision,
+  type GuidedActivity,
   type Activity,
 } from '../../domain/activity'
 import { ENVIRONMENTS } from '../../domain/workouts'
@@ -28,11 +32,18 @@ export function RewardSplit({
         +{activity.reward.totalXp} <span>XP</span>
       </p>
       <p className="reward-caption">
-        {activity.result.status === 'completed'
-          ? 'Séance complète'
-          : 'Séance partielle'}{' '}
-        · {durationLabel(activity.result.performedSeconds)} de mouvement
-        confirmé
+        {activity.kind === 'manual'
+          ? 'Entraînement déclaré'
+          : activity.result.status === 'completed'
+            ? 'Séance complète'
+            : 'Séance partielle'}{' '}
+        ·{' '}
+        {durationLabel(
+          activity.kind === 'manual'
+            ? activity.durationSeconds
+            : activity.result.performedSeconds,
+        )}{' '}
+        de mouvement confirmé
       </p>
       <dl className="reward-paths">
         {PATHS.map((path) => (
@@ -50,7 +61,92 @@ export function RewardSplit({
   )
 }
 
+function ActivityNotes({ activity }: { activity: Activity }) {
+  const notes = getActivityNotes(activity)
+  return (
+    <>
+      {notes && (
+        <section className="activity-note" aria-label="Notes de l’activité">
+          <h2>Mes notes</h2>
+          <p>{notes}</p>
+        </section>
+      )}
+      {getActivityRevision(activity) > 1 && (
+        <p className="progress-help">
+          Modifiée le {displayDate(activity.updatedAt!)}. Le bilan corrigé
+          remplace la contribution précédente.
+        </p>
+      )}
+    </>
+  )
+}
+
 export function ActivityDetails({ activity }: { activity: Activity }) {
+  if (activity.kind === 'guided')
+    return <GuidedActivityDetails activity={activity} />
+  return (
+    <article className="activity-detail">
+      <div className="recorded-note">
+        <CheckCircle2 size={19} aria-hidden="true" />
+        <p>
+          Entraînement ajouté à ton carnet. Il contribue aux voies déclarées,
+          sans valider d’étape Viking.
+        </p>
+      </div>
+      <div className="progress-heading">
+        <p className="eyebrow">ACTIVITÉ DÉCLARÉE</p>
+        <h1>
+          {activity.title}
+          <span>.</span>
+        </h1>
+        <p>Entraînement du {displayDate(activity.occurredAt)}</p>
+      </div>
+      <div className="report-layout">
+        <div>
+          <h2>Ce que tu as déclaré</h2>
+          <dl className="activity-facts">
+            <div>
+              <dt>Durée de pratique</dt>
+              <dd>{durationLabel(activity.durationSeconds)}</dd>
+            </div>
+            <div>
+              <dt>Ajouté au carnet</dt>
+              <dd>{displayDate(activity.recordedAt)}</dd>
+            </div>
+          </dl>
+          <h3>Les voies travaillées</h3>
+          <ul>
+            {activity.pathIds.map((id) => (
+              <li key={id}>{PATHS.find((path) => path.id === id)!.label}</li>
+            ))}
+          </ul>
+          <ActivityNotes activity={activity} />
+          <p className="progress-help">
+            La durée et l’orientation sont déclarées par toi. Elles ne mesurent
+            ni ta technique ni tes répétitions.
+          </p>
+        </div>
+        <div>
+          <RewardSplit activity={activity} />
+          <details className="reward-policy">
+            <summary>Le barème de cet entraînement</summary>
+            <p>
+              10 XP par minute de pratique déclarée, partagées à parts égales
+              entre les voies sélectionnées. Les unités restantes suivent
+              l’ordre Puissant, Infatigable, Technicien, Stratège.
+            </p>
+            <p>
+              Barème version 3. Cette activité ne valide aucune étape du
+              parcours Viking.
+            </p>
+          </details>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function GuidedActivityDetails({ activity }: { activity: GuidedActivity }) {
   const session = activity.session
   return (
     <article className="activity-detail">
@@ -69,7 +165,7 @@ export function ActivityDetails({ activity }: { activity: Activity }) {
           {session.snapshot.workoutTitle}
           <span>.</span>
         </h1>
-        <p>Séance du {displayDate(session.createdAt)}</p>
+        <p>Séance du {displayDate(getActivityDate(activity))}</p>
       </div>
       <div className="report-layout">
         <div>
@@ -114,6 +210,7 @@ export function ActivityDetails({ activity }: { activity: Activity }) {
               )
             })}
           </ol>
+          <ActivityNotes activity={activity} />
           <p className="progress-help">
             Le temps chronométré inclut les récupérations prévues. Les durées
             déclarées décrivent ton activité, sans mesurer ta technique ni tes

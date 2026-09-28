@@ -1,0 +1,325 @@
+.activity-editor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 44px;
+  align-items: start;
+}
+.activity-editor-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.activity-editor-field {
+  min-width: 0;
+  margin-bottom: 23px;
+}
+.activity-editor-field > label {
+  display: block;
+  margin-bottom: 9px;
+  color: #34492e;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.7;
+}
+.activity-editor-field > label > span {
+  color: #6d7861;
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 5px;
+}
+.activity-editor-field input,
+.activity-editor-field textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 48px;
+  border: 1px solid #abb99b;
+  border-radius: 5px;
+  padding: 11px 12px;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  background: #fafbf4;
+  color: var(--ink);
+}
+.activity-editor-field textarea {
+  resize: vertical;
+  min-height: 140px;
+}
+.activity-editor-field input:disabled,
+.activity-editor-field textarea:disabled {
+  background: #e8eadf;
+  color: #718063;
+}
+.activity-editor-field input::placeholder {
+  color: #77816c;
+}
+.activity-editor-field > p,
+.activity-path-choices > p,
+.activity-guided-blocks > p,
+.activity-editor-conflict > p {
+  color: #66745b;
+  font-size: 11px;
+  line-height: 1.85;
+  margin: 8px 0 0;
+}
+.activity-editor-field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 16px;
+}
+.activity-path-choices,
+.activity-guided-blocks {
+  border: 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+  padding: 19px 0 0;
+  margin: 3px 0 28px;
+}
+.activity-path-choices legend,
+.activity-guided-blocks legend {
+  padding: 0 10px 0 0;
+  font-size: 20px;
+  font-weight: 750;
+  color: #34492e;
+}
+.activity-path-choices > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.activity-path-choices label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 16px 12px;
+  min-height: 88px;
+  background: #f2f4e9;
+  border: 1px solid #c5cfb7;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.activity-path-choices label.activity-path-selected {
+  background: #e7eddb;
+  border-color: #6d8751;
+}
+.activity-path-choices input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: #546d41;
+  margin: 1px 0 0;
+}
+.activity-path-choices strong,
+.activity-path-choices small {
+  display: block;
+  line-height: 1.65;
+}
+.activity-path-choices strong {
+  font-size: 12px;
+  font-weight: 750;
+}
+.activity-path-choices small {
+  color: #66745b;
+  font-size: 10px;
+  margin-top: 4px;
+}
+.activity-editor-origin {
+  padding: 19px 20px;
+  margin: 0 0 24px;
+  background: #e9edde;
+  border-left: 3px solid #738c58;
+}
+.activity-editor-origin h2 {
+  font-size: 22px;
+  margin: 0 0 6px;
+}
+.activity-editor-origin p {
+  color: #596d4c;
+  font-size: 12px;
+  line-height: 1.9;
+  margin: 5px 0 0;
+}
+.activity-editor-block {
+  padding: 19px;
+  margin-top: 14px;
+  border: 1px solid #cbd4bd;
+  border-radius: 5px;
+  background: #f2f4e9;
+}
+.activity-editor-block h3 {
+  font-size: 15px;
+  line-height: 1.7;
+  margin: 0;
+}
+.activity-editor-block .activity-editor-field {
+  margin: 15px 0 0;
+}
+.activity-editor-block .activity-editor-field > label {
+  font-size: 11px;
+}
+.activity-editor-block input {
+  max-width: 125px;
+}
+.activity-editor-summary {
+  min-width: 0;
+  position: sticky;
+  top: 24px;
+}
+.activity-editor-replacement {
+  margin: 0 0 15px;
+  color: #5a6d4c;
+  font-size: 12px;
+  line-height: 1.9;
+}
+.activity-editor-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  border: 1px solid #8b9b7a;
+  border-radius: 4px;
+  background: transparent;
+  color: #415b31;
+  padding: 11px 15px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.activity-editor-conflict {
+  margin: 0 0 20px;
+}
+.activity-editor [aria-disabled='true'] {
+  color: #78816e;
+  cursor: default;
+}
+.activity-delete-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 11px 0;
+  background: transparent;
+  color: #984c35;
+  border: 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.activity-delete-button:hover {
+  text-decoration: underline;
+}
+.activity-delete-dialog {
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  margin: auto;
+  border: 1px solid #bbc5ac;
+  border-radius: 8px;
+  padding: 28px;
+  background: #f5f4eb;
+  color: var(--ink);
+  box-shadow: 0 22px 75px #1c2c2440;
+}
+.activity-delete-dialog::backdrop {
+  background: #1b2c27a8;
+}
+.activity-delete-dialog > .eyebrow {
+  font-size: 9px;
+  color: #8a593e;
+  margin: 0 0 15px;
+}
+.activity-delete-dialog h2 {
+  font-size: 30px;
+  line-height: 1.2;
+  margin: 0 0 21px;
+}
+.activity-delete-dialog > p:not(.eyebrow) {
+  font-size: 13px;
+  line-height: 1.85;
+}
+.activity-delete-target {
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 16px 0;
+}
+.activity-delete-target strong,
+.activity-delete-target span {
+  display: block;
+}
+.activity-delete-target strong {
+  font-size: 15px;
+  line-height: 1.6;
+}
+.activity-delete-target span {
+  color: #66745b;
+  font-size: 11px;
+  margin-top: 5px;
+}
+.activity-delete-notice {
+  background: #e4ead8;
+  color: #405a31;
+  padding: 12px;
+  border-radius: 4px;
+}
+.activity-delete-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+.activity-delete-actions button {
+  flex: 1;
+  min-height: 48px;
+  padding: 12px;
+  background: #e6eadc;
+  color: #354b2b;
+  border: 1px solid #bbc7aa;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.6;
+}
+.activity-delete-actions .activity-delete-confirm {
+  color: #fff7f1;
+  background: #914c35;
+  border-color: #914c35;
+}
+.activity-delete-actions button:disabled,
+.activity-editor-secondary:disabled {
+  opacity: 0.55;
+}
+@media (max-width: 700px) {
+  .activity-editor-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 25px;
+  }
+  .activity-editor .progress-heading h1 {
+    font-size: 46px;
+  }
+  .activity-editor-field-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .activity-editor-summary {
+    position: static;
+  }
+  .activity-path-choices > div {
+    gap: 10px;
+  }
+  .activity-path-choices label {
+    padding: 14px 10px;
+    gap: 8px;
+  }
+  .activity-editor-block {
+    padding: 16px;
+  }
+  .activity-delete-dialog {
+    padding: 23px;
+  }
+  .activity-delete-actions {
+    flex-direction: column;
+  }
+}

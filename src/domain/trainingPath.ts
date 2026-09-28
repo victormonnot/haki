@@ -150,7 +150,8 @@ export function derivePathProgress(
   for (const activity of activities) {
     if (!isActivity(activity) || seen.has(activity.id)) continue
     seen.add(activity.id)
-    if (activity.result.status !== 'completed') continue
+    if (activity.kind !== 'guided' || activity.result.status !== 'completed')
+      continue
 
     const snapshot = activity.session.snapshot
     const node = byId.get(snapshot.workoutId)

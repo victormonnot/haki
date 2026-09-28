@@ -1,9 +1,10 @@
 const DATABASE_NAME = 'haki'
-const DATABASE_VERSION = 3
+const DATABASE_VERSION = 4
 
 export const TRAINING_PROFILES_STORE = 'training-profiles'
 export const SESSION_DRAFTS_STORE = 'session-drafts'
 export const ACTIVITIES_STORE = 'activities'
+export const ACTIVITY_DELETIONS_STORE = 'activity-deletions'
 
 export function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -29,6 +30,7 @@ export function openDatabase(): Promise<IDBDatabase> {
         TRAINING_PROFILES_STORE,
         SESSION_DRAFTS_STORE,
         ACTIVITIES_STORE,
+        ACTIVITY_DELETIONS_STORE,
       ]) {
         if (!database.objectStoreNames.contains(storeName)) {
           database.createObjectStore(storeName, { keyPath: 'id' })

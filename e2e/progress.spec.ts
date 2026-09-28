@@ -502,7 +502,7 @@ test('exports a versioned backup containing history, a saved profile, and the cu
   const backup = JSON.parse(await readFile(path!, 'utf8'))
   expect(backup).toMatchObject({
     format: 'haki-backup',
-    version: 1,
+    version: 2,
     activities: [{ id: completedId, reward: { totalXp: 100 } }],
     profiles: [{ id: 'home', name: 'Maison', setup: { availableMinutes: 20 } }],
     session: {

@@ -1,7 +1,22 @@
-import { useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, Download, NotebookPen } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  ArrowLeft,
+  ArrowRight,
+  Download,
+  NotebookPen,
+  Plus,
+  Pencil,
+} from 'lucide-react'
 import { exportTrainingData } from '../../data/activities'
-import { getProgress } from '../../domain/activity'
+import {
+  getProgress,
+  getActivityDate,
+  getActivityTitle,
+  getActivityDuration,
+} from '../../domain/activity'
+import { localDateKey, monthLabel, dayLabel } from '../../domain/calendar'
+import HistoryCalendar from './HistoryCalendar'
+import { ActivityDeleteButton } from './ActivityEditor'
 import { durationLabel } from '../preparation/durationLabel'
 import { ActivityDetails, ProgressOverview } from './ProgressDetails'
 import { displayDate } from './displayDate'
@@ -43,6 +58,33 @@ export default function HistoryScreen({
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
   const exportingRef = useRef(false)
+  const [today, setToday] = useState(() => localDateKey(Date.now()))
+  const [month, setMonth] = useState(() => today.slice(0, 7))
+  const [filter, setFilter] = useState('all')
+  useEffect(() => {
+    const update = () => setToday(localDateKey(Date.now()))
+    const interval = window.setInterval(update, 60_000)
+    window.addEventListener('focus', update)
+    document.addEventListener('visibilitychange', update)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', update)
+      document.removeEventListener('visibilitychange', update)
+    }
+  }, [])
+  const filtered = history.activities.filter((item) => {
+    const day = localDateKey(getActivityDate(item))
+    return (
+      filter === 'all' ||
+      (filter === 'month' ? day.startsWith(`${month}-`) : day === filter)
+    )
+  })
+  const filterLabel =
+    filter === 'all'
+      ? 'Tout ton historique, du plus récent au plus ancien.'
+      : filter === 'month'
+        ? `Entraînements de ${monthLabel(month)}.`
+        : dayLabel(filter)
 
   async function download() {
     if (exportingRef.current) return
@@ -81,7 +123,8 @@ export default function HistoryScreen({
           <ArrowLeft size={17} aria-hidden="true" /> Tout mon carnet
         </a>
       )}
-      {history.loading ? (
+      {history.loading &&
+      (activityId ? !activity : !history.activities.length) ? (
         <p role="status">Chargement du carnet…</p>
       ) : history.error ? (
         <div className="session-notice">
@@ -90,7 +133,18 @@ export default function HistoryScreen({
         </div>
       ) : activityId ? (
         activity ? (
-          <ActivityDetails activity={activity} />
+          <>
+            <ActivityDetails activity={activity} />
+            <div className="activity-management">
+              <a
+                className="progress-link"
+                href={`#activite/modifier/${encodeURIComponent(activity.id)}`}
+              >
+                <Pencil size={17} aria-hidden="true" /> Modifier cette activité
+              </a>
+              <ActivityDeleteButton activity={activity} history={history} />
+            </div>
+          </>
         ) : (
           <div className="progress-empty">
             <h1>Activité introuvable.</h1>
@@ -114,14 +168,20 @@ export default function HistoryScreen({
                 toi.
               </p>
             </div>
-            <button
-              className="export-button"
-              disabled={exporting}
-              onClick={() => void download()}
-            >
-              <Download size={18} aria-hidden="true" />
-              {exporting ? 'Préparation…' : 'Exporter mes données'}
-            </button>
+            <div className="history-actions">
+              <a className="progress-primary" href="#activite/nouvelle">
+                <Plus size={18} aria-hidden="true" />
+                Ajouter un entraînement
+              </a>
+              <button
+                className="export-button"
+                disabled={exporting}
+                onClick={() => void download()}
+              >
+                <Download size={18} aria-hidden="true" />
+                {exporting ? 'Préparation…' : 'Exporter mes données'}
+              </button>
+            </div>
           </div>
           {exportError && (
             <p role="alert" className="report-validation">
@@ -129,62 +189,114 @@ export default function HistoryScreen({
             </p>
           )}
           <ProgressOverview activities={history.activities} />
-          <section className="activity-list" aria-labelledby="history-title">
-            <div className="report-section-title">
-              <h2 id="history-title">Tes séances</h2>
-              <span>
-                {history.activities.length} activité
-                {history.activities.length > 1 ? 's' : ''}
-              </span>
-            </div>
-            {!history.activities.length ? (
-              <div className="progress-empty">
-                <p>Ton premier entraînement ouvre le carnet.</p>
-                <p>
-                  Prépare une séance, suis le guide, puis confirme ton réalisé
-                  pour retrouver ton activité ici.
-                </p>
-                <a className="progress-link" href="#preparation">
-                  Préparer une séance{' '}
-                  <ArrowRight size={17} aria-hidden="true" />
-                </a>
+          <div className="history-journal">
+            <HistoryCalendar
+              activities={history.activities}
+              today={today}
+              month={month}
+              selectedDay={
+                filter === 'all' || filter === 'month' ? null : filter
+              }
+              onMonthChange={(value) => {
+                setMonth(value)
+                setFilter('month')
+              }}
+              onDaySelect={(value) => {
+                setMonth(value.slice(0, 7))
+                setFilter(value)
+              }}
+            />
+            <section className="activity-list" aria-labelledby="history-title">
+              <div className="report-section-title">
+                <h2 id="history-title">Tes séances</h2>
+                <span>
+                  {filtered.length} activité
+                  {filtered.length > 1 ? 's' : ''}
+                </span>
               </div>
-            ) : (
-              <ol>
-                {history.activities.map((item) => (
-                  <li key={item.id}>
-                    <a href={`#historique/${encodeURIComponent(item.id)}`}>
-                      <div className="activity-list-date">
-                        {displayDate(item.session.createdAt)}
-                      </div>
-                      <div className="activity-list-main">
-                        <div>
-                          <h3>{item.session.snapshot.workoutTitle}</h3>
-                          <p>
-                            {item.session.snapshot.variant.title} ·{' '}
-                            {durationLabel(item.result.performedSeconds)} de
-                            mouvement
-                          </p>
-                          <span
-                            className={`activity-status status-${item.result.status}`}
-                          >
-                            {item.result.status === 'completed'
-                              ? 'Complète'
-                              : 'Partielle'}
-                          </span>
+              <div className="history-filters" aria-label="Filtrer le carnet">
+                <button
+                  aria-pressed={filter === 'all'}
+                  onClick={() => setFilter('all')}
+                >
+                  Tout le carnet
+                </button>
+                <button
+                  aria-pressed={filter === 'month'}
+                  onClick={() => setFilter('month')}
+                >
+                  Mois affiché
+                </button>
+                <button
+                  aria-pressed={filter === today}
+                  onClick={() => {
+                    setMonth(today.slice(0, 7))
+                    setFilter(today)
+                  }}
+                >
+                  Aujourd’hui
+                </button>
+              </div>
+              <p className="history-filter-label" aria-live="polite">
+                {filterLabel}
+              </p>
+              {!filtered.length ? (
+                <div className="progress-empty">
+                  <p>
+                    {history.activities.length
+                      ? 'Aucun entraînement pour cette période.'
+                      : 'Ton premier entraînement ouvre le carnet.'}
+                  </p>
+                  <p>
+                    Prépare une séance, suis le guide, puis confirme ton réalisé
+                    pour retrouver ton activité ici.
+                  </p>
+                  <a className="progress-link" href="#preparation">
+                    Préparer une séance{' '}
+                    <ArrowRight size={17} aria-hidden="true" />
+                  </a>
+                </div>
+              ) : (
+                <ol>
+                  {filtered.map((item) => (
+                    <li key={item.id}>
+                      <a href={`#historique/${encodeURIComponent(item.id)}`}>
+                        <div className="activity-list-date">
+                          {displayDate(getActivityDate(item))}
                         </div>
-                        <strong>
-                          +{item.reward.totalXp}
-                          <small> XP</small>
-                          <ArrowRight size={18} aria-hidden="true" />
-                        </strong>
-                      </div>
-                    </a>
-                  </li>
-                ))}
-              </ol>
-            )}
-          </section>
+                        <div className="activity-list-main">
+                          <div>
+                            <h3>{getActivityTitle(item)}</h3>
+                            <p>
+                              {item.kind === 'guided'
+                                ? item.session.snapshot.variant.title
+                                : 'Ajout au carnet'}{' '}
+                              · {durationLabel(getActivityDuration(item))} de
+                              pratique
+                            </p>
+                            <span
+                              className={`activity-status status-${item.kind === 'manual' ? 'manual' : item.result.status}`}
+                            >
+                              {item.kind === 'manual'
+                                ? 'Déclarée'
+                                : item.result.status === 'completed'
+                                  ? 'Complète'
+                                  : 'Partielle'}
+                            </span>
+                          </div>
+                          <strong>
+                            +{item.reward.totalXp}
+                            <small> XP</small>
+                            <ArrowRight size={18} aria-hidden="true" />
+                          </strong>
+                        </div>
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+          </div>
           <p className="progress-local-note">
             Ton carnet reste dans ce navigateur, sur cet appareil. L’export JSON
             contient les activités, les profils enregistrés et le brouillon en

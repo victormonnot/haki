@@ -12,7 +12,7 @@ import {
   getProgress,
   getReportablePhases,
   isActivity,
-  type Activity,
+  type GuidedActivity,
   type PhaseResult,
 } from './activity'
 import {
@@ -115,7 +115,7 @@ function weightedSession(): SessionDraft {
   return session
 }
 
-function completeActivity(variant = FIRST_WORKOUT.variants[0]): Activity {
+function completeActivity(variant = FIRST_WORKOUT.variants[0]): GuidedActivity {
   const session = terminalSession(variant)
   return createActivity(session, allPerformed(session), 3_000)
 }
@@ -640,6 +640,7 @@ describe('phase-weighted reward policy', () => {
       xpToNextLevel: 94,
       completedCount: 2,
       partialCount: 0,
+      manualCount: 0,
     })
     expect(activities).toEqual(original)
   })
@@ -655,6 +656,7 @@ describe('getProgress', () => {
       xpToNextLevel: 100,
       completedCount: 0,
       partialCount: 0,
+      manualCount: 0,
     })
   })
 
@@ -676,6 +678,7 @@ describe('getProgress', () => {
       xpToNextLevel: 27,
       completedCount: 3,
       partialCount: 0,
+      manualCount: 0,
     })
   })
 

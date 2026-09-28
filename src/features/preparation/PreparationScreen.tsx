@@ -17,6 +17,12 @@ import {
 } from 'lucide-react'
 import { FIRST_WORKOUT } from '../../content/workouts'
 import {
+  canStartWorkout,
+  type TrainingPathProgress,
+} from '../../domain/trainingPath'
+import type { ActivityHistoryController } from '../progress/useActivityHistory'
+import { WorkoutAccessNote } from '../path/PathScreen'
+import {
   EQUIPMENT,
   ENVIRONMENTS,
   EXPERIENCES,
@@ -27,6 +33,7 @@ import {
   type Experience,
   type TrainingSetup,
   type WorkoutVariant,
+  type Workout,
 } from '../../domain/workouts'
 import type { ProfileId } from '../../data/trainingProfiles'
 import { useTrainingProfiles } from './useTrainingProfiles'
@@ -66,9 +73,15 @@ function ContentNote() {
 function PreparationScreen({
   active,
   session,
+  workout,
+  progress,
+  history,
 }: {
   active: boolean
   session: WorkoutSessionController
+  workout: Workout
+  progress: TrainingPathProgress
+  history: ActivityHistoryController
 }) {
   const { profiles, loading, saving, error, saveProfile } =
     useTrainingProfiles()
@@ -77,19 +90,51 @@ function PreparationScreen({
     Partial<Record<ProfileId, TrainingSetup>>
   >({})
   const [savedMessage, setSavedMessage] = useState('')
-  const [variantId, setVariantId] = useState('fondations')
-  const [prepared, setPrepared] = useState<{
-    variant: WorkoutVariant
-    setup: TrainingSetup
-  } | null>(null)
+  const defaultVariant =
+    workout.id === FIRST_WORKOUT.id ? 'fondations' : workout.variants[0].id
+  const [selection, setSelection] = useState<{
+    workoutId: string
+    variantId: string
+    prepared: { variant: WorkoutVariant; setup: TrainingSetup } | null
+  }>({ workoutId: workout.id, variantId: defaultVariant, prepared: null })
+  // Reset only the workout selection; keep unsaved equipment/profile edits across the path.
+  if (selection.workoutId !== workout.id) {
+    setSelection({
+      workoutId: workout.id,
+      variantId: defaultVariant,
+      prepared: null,
+    })
+  }
+  const { variantId, prepared } =
+    selection.workoutId === workout.id
+      ? selection
+      : { variantId: defaultVariant, prepared: null }
+  const setVariantId = (id: string) =>
+    setSelection((current) => ({ ...current, variantId: id }))
+  const setPrepared = (value: typeof prepared) =>
+    setSelection((current) => ({ ...current, prepared: value }))
+  const accessible =
+    !history.loading && !history.error && canStartWorkout(progress, workout.id)
+  const accessNote = (
+    <WorkoutAccessNote
+      workout={workout}
+      progress={progress}
+      history={history}
+    />
+  )
+  const durations = workout.variants.map(getDurationSeconds)
+  const durationRange =
+    Math.min(...durations) === Math.max(...durations)
+      ? durationLabel(durations[0])
+      : `${Math.min(...durations) / 60} à ${Math.max(...durations) / 60} min`
   const mainRef = useRef<HTMLElement>(null)
   const previousPrepared = useRef(prepared)
   const setup = drafts[profileId] ?? profiles[profileId].setup
-  const variant = FIRST_WORKOUT.variants.find((item) => item.id === variantId)!
+  const variant = workout.variants.find((item) => item.id === variantId)!
   const assessment = assessVariant(variant, setup)
   const dirty =
     JSON.stringify(setup) !== JSON.stringify(profiles[profileId].setup)
-  const alternatives = FIRST_WORKOUT.variants.filter(
+  const alternatives = workout.variants.filter(
     (item) => item.id !== variantId && assessVariant(item, setup).compatible,
   )
 
@@ -141,6 +186,7 @@ function PreparationScreen({
           <ArrowLeft size={17} aria-hidden="true" />
           Modifier ma préparation
         </button>
+        {accessNote}
         <section className="prepared-heading" aria-labelledby="prepared-title">
           <p className="eyebrow">
             <CheckCircle2 size={16} aria-hidden="true" /> UNE SÉANCE ADAPTÉE À
@@ -150,7 +196,7 @@ function PreparationScreen({
             Ta séance est prête<span>.</span>
           </h1>
           <p>
-            {FIRST_WORKOUT.title} <span> / </span> {prepared.variant.title}
+            {workout.title} <span> / </span> {prepared.variant.title}
           </p>
           <div className="prepared-facts">
             <span>
@@ -180,6 +226,8 @@ function PreparationScreen({
             <MovementGuide variant={prepared.variant} />
             <SessionPreparationActions
               session={session}
+              workout={workout}
+              accessible={accessible}
               variant={prepared.variant}
               setup={prepared.setup}
             />
@@ -197,20 +245,34 @@ function PreparationScreen({
       ref={mainRef}
       tabIndex={-1}
     >
+      {accessNote}
       <section className="prep-hero" aria-labelledby="workout-title">
         <div>
           <p className="eyebrow">
-            <span className="short-line" /> VIKING · LE COMMENCEMENT
+            <span className="short-line" /> VIKING ·{' '}
+            {workout.id === FIRST_WORKOUT.id
+              ? 'LE COMMENCEMENT'
+              : 'L’APPEL DU NORD'}
           </p>
           <h1 id="workout-title">
-            L’ÉVEIL
-            <br />
-            <span>DU NORD.</span>
+            {workout.id === FIRST_WORKOUT.id ? (
+              <>
+                L’ÉVEIL
+                <br />
+                <span>DU NORD.</span>
+              </>
+            ) : (
+              <>
+                {workout.title}
+                <span>.</span>
+              </>
+            )}
           </h1>
-          <p>{FIRST_WORKOUT.description}</p>
+          <p>{workout.description}</p>
           <div className="hero-facts">
             <span>
-              <Clock3 size={15} aria-hidden="true" />8 à 14 min
+              <Clock3 size={15} aria-hidden="true" />
+              {durationRange}
             </span>
             <span>
               <Shield size={15} aria-hidden="true" />
@@ -421,7 +483,7 @@ function PreparationScreen({
           </div>
           <fieldset className="variant-options">
             <legend className="sr-only">Variante de la séance</legend>
-            {FIRST_WORKOUT.variants.map((item) => {
+            {workout.variants.map((item) => {
               const result = assessVariant(item, setup)
               const selected = variantId === item.id
               return (
@@ -494,6 +556,8 @@ function PreparationScreen({
               </div>
               <p>
                 Une orientation du contenu, pas une mesure de tes capacités.
+                {variant.phases.some((phase) => phase.pathWeights) &&
+                  ' Répartition prévue pour la séance entière ; un bilan partiel suit les blocs confirmés.'}
               </p>
             </div>
           </div>

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FIRST_WORKOUT, MOVEMENTS } from '../../content/workouts'
-import { finalizeSession } from '../../data/activities'
+import { getWorkout, MOVEMENTS } from '../../content/workouts'
+import { VIKING_PATH } from '../../content/vikingPath'
+import { canStartWorkout, derivePathProgress } from '../../domain/trainingPath'
+import { finalizeSession, listActivities } from '../../data/activities'
 import type { Activity, PhaseResult } from '../../domain/activity'
 import {
   createSessionDraft,
@@ -16,11 +18,7 @@ import {
   startTimer,
   type TimerState,
 } from '../../domain/timer'
-import {
-  assessVariant,
-  type TrainingSetup,
-  type WorkoutVariant,
-} from '../../domain/workouts'
+import { assessVariant, type TrainingSetup } from '../../domain/workouts'
 import {
   deleteSessionDraft,
   loadSessionDraft,
@@ -66,6 +64,7 @@ export function useWorkoutSession(active: boolean) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
+  const [launchError, setLaunchError] = useState<string | null>(null)
   const [problem, setProblem] = useState<
     'storage' | 'conflict' | 'corrupt' | null
   >(null)
@@ -278,13 +277,18 @@ export function useWorkoutSession(active: boolean) {
 
   const open = useCallback(
     async (
-      variant: WorkoutVariant,
+      workoutId: string,
+      variantId: string,
       setup: TrainingSetup,
       mode: SessionMode,
     ) => {
+      const workout = getWorkout(workoutId)
+      const variant = workout?.variants.find((item) => item.id === variantId)
       if (
         working.current ||
         loading ||
+        !workout ||
+        !variant ||
         !assessVariant(variant, setup).compatible
       )
         return false
@@ -292,9 +296,30 @@ export function useWorkoutSession(active: boolean) {
       pause(true)
       working.current = true
       setBusy(true)
+      setLaunchError(null)
       try {
+        // Re-read confirmed results: another tab may have changed access since preparation.
+        try {
+          const activities = await listActivities()
+          if (
+            !canStartWorkout(
+              derivePathProgress(VIKING_PATH, activities),
+              workout.id,
+            )
+          ) {
+            setLaunchError(
+              'Cette séance est encore verrouillée. Retrouve les prérequis dans le parcours Viking.',
+            )
+            return false
+          }
+        } catch {
+          setLaunchError(
+            'Impossible de vérifier les prérequis. Recharge le carnet, puis réessaie.',
+          )
+          return false
+        }
         const next = createSessionDraft(
-          FIRST_WORKOUT,
+          workout,
           variant,
           setup,
           MOVEMENTS,
@@ -498,6 +523,7 @@ export function useWorkoutSession(active: boolean) {
   }, [cancel, speak])
 
   return {
+    launchError,
     draft,
     realDraft,
     loading,

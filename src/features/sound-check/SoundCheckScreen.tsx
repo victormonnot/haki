@@ -21,7 +21,11 @@ function formatTime(milliseconds: number) {
     .padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`
 }
 
-function SoundCheckScreen() {
+function SoundCheckScreen({
+  preparationHref = '#preparation',
+}: {
+  preparationHref?: string
+}) {
   const check = useSoundCheck()
   const wakeLock = useWakeLock(check.status === 'running')
   const phase = SOUND_CHECK_PHASES[check.phaseIndex]
@@ -317,7 +321,7 @@ function SoundCheckScreen() {
         <p>
           Prendre le temps de bien commencer.
           <span>
-            <a href="#preparation">Préparer ma séance Viking</a>
+            <a href={preparationHref}>Préparer ma séance Viking</a>
           </span>
         </p>
         <span className="closing-signature" aria-hidden="true">

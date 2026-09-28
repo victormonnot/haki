@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { FIRST_WORKOUT, MOVEMENTS } from '../content/workouts'
 import {
+  FIRST_WORKOUT,
+  MOVEMENTS,
+  WORKOUTS,
+  getWorkout,
+} from '../content/workouts'
+import {
+  REWARD_POLICY_V1,
+  REWARD_POLICY_V2,
   createActivity,
   getProgress,
   getReportablePhases,
@@ -87,6 +94,25 @@ function sampleSession(): SessionDraft {
     ],
   }
   return terminalSession(variant)
+}
+
+function weightedSession(): SessionDraft {
+  const session = sampleSession()
+  session.snapshot.variant.pathWeights = {
+    power: 0,
+    endurance: 25,
+    technique: 35,
+    strategy: 40,
+  }
+  for (const phase of session.snapshot.variant.phases) {
+    if (phase.kind !== 'rest') {
+      phase.pathWeights =
+        phase.kind === 'work'
+          ? { power: 0, endurance: 0, technique: 20, strategy: 80 }
+          : { power: 0, endurance: 50, technique: 50, strategy: 0 }
+    }
+  }
+  return session
 }
 
 function completeActivity(variant = FIRST_WORKOUT.variants[0]): Activity {
@@ -418,6 +444,204 @@ describe('XP distribution', () => {
         expect(Math.abs(activity.reward.pathXp[key] - quota)).toBeLessThan(1)
       }
     }
+  })
+})
+
+describe('phase-weighted reward policy', () => {
+  it('records every new published variant with version two while preserving the original catalogue', () => {
+    for (const workout of WORKOUTS) {
+      for (const variant of workout.variants) {
+        const session = terminalSession(variant)
+        session.snapshot.workoutId = workout.id
+        session.snapshot.workoutVersion = workout.version
+        const activity = createActivity(session, allPerformed(session), 3_000)
+        expect(activity.reward.policyVersion).toBe(
+          workout.id === FIRST_WORKOUT.id ? 1 : 2,
+        )
+        expect(isActivity(activity)).toBe(true)
+      }
+    }
+  })
+
+  it('awards no strategy XP when the real Guetteur catalogue stops before its signals', () => {
+    const workout = getWorkout('les-signaux-du-guetteur')!
+    for (const variant of workout.variants) {
+      const session = terminalSession(variant)
+      session.snapshot.workoutId = workout.id
+      session.status = 'stopped'
+      session.elapsedMs = variant.phases
+        .filter((phase) => phase.kind === 'warmup')
+        .reduce((total, phase) => total + phase.durationSeconds * 1_000, 0)
+      const activity = createActivity(session, allPerformed(session), 3_000)
+      expect(activity.reward).toEqual({
+        ...REWARD_POLICY_V2,
+        totalXp: 60,
+        pathXp: { power: 0, endurance: 30, technique: 30, strategy: 0 },
+      })
+      expect(activity.result.status).toBe('partial')
+      expect(isActivity(activity)).toBe(true)
+    }
+  })
+
+  it('keeps legacy rewards on version one without adding phase weights', () => {
+    const activity = completeActivity(FIRST_WORKOUT.variants[1])
+    expect(activity.reward).toEqual({
+      ...REWARD_POLICY_V1,
+      totalXp: 100,
+      pathXp: { power: 35, endurance: 30, technique: 35, strategy: 0 },
+    })
+    expect(
+      activity.session.snapshot.variant.phases.every(
+        (phase) => phase.pathWeights === undefined,
+      ),
+    ).toBe(true)
+    expect(isActivity(activity)).toBe(true)
+  })
+
+  it('never rewards unreached signal exercises after a warmup-only stop', () => {
+    const session = weightedSession()
+    session.status = 'stopped'
+    session.elapsedMs = 10_000
+    const activity = createActivity(session, allPerformed(session), 3_000)
+
+    expect(activity.result).toMatchObject({
+      status: 'partial',
+      performedSeconds: 10,
+    })
+    expect(activity.reward).toEqual({
+      ...REWARD_POLICY_V2,
+      totalXp: 1,
+      pathXp: { power: 0, endurance: 1, technique: 0, strategy: 0 },
+    })
+    expect(isActivity(JSON.parse(JSON.stringify(activity)))).toBe(true)
+  })
+
+  it('uses confirmed seconds of each phase instead of the variant-wide distribution', () => {
+    const session = weightedSession()
+    const results = allPerformed(session).map((result) => ({
+      ...result,
+      performedSeconds: result.phaseId === 'work' ? 20 : 0,
+    }))
+    const activity = createActivity(session, results, 3_000)
+
+    expect(activity.reward).toEqual({
+      ...REWARD_POLICY_V2,
+      totalXp: 3,
+      pathXp: { power: 0, endurance: 0, technique: 1, strategy: 2 },
+    })
+    expect(activity.result.status).toBe('partial')
+    expect(isActivity(activity)).toBe(true)
+  })
+
+  it('distributes complete rewards from duration-weighted phase quotas and ignores rest', () => {
+    const session = weightedSession()
+    for (const phase of session.snapshot.variant.phases) {
+      if (phase.kind === 'rest')
+        phase.pathWeights = {
+          power: 100,
+          endurance: 0,
+          technique: 0,
+          strategy: 0,
+        }
+    }
+    const activity = createActivity(session, allPerformed(session), 3_000)
+    expect(activity.result).toMatchObject({
+      performedSeconds: 40,
+      status: 'completed',
+    })
+    expect(activity.reward).toEqual({
+      ...REWARD_POLICY_V2,
+      totalXp: 6,
+      pathXp: { power: 0, endurance: 2, technique: 2, strategy: 2 },
+    })
+    expect(isActivity(activity)).toBe(true)
+    session.snapshot.variant.phases[0].pathWeights!.strategy = 100
+    expect(
+      activity.session.snapshot.variant.phases[0].pathWeights!.strategy,
+    ).toBe(0)
+  })
+
+  it('preserves integer totals and stable ties for every small confirmation amount', () => {
+    const session = weightedSession()
+    for (const phase of session.snapshot.variant.phases) {
+      if (phase.kind !== 'rest')
+        phase.pathWeights = {
+          power: 25,
+          endurance: 25,
+          technique: 25,
+          strategy: 25,
+        }
+    }
+    for (let seconds = 1; seconds <= 40; seconds += 1) {
+      let remaining = seconds
+      const results = allPerformed(session).map((result) => {
+        const performedSeconds = Math.min(result.performedSeconds, remaining)
+        remaining -= performedSeconds
+        return { ...result, performedSeconds }
+      })
+      const activity = createActivity(session, results, 3_000)
+      const totalXp = Math.floor(seconds / 6)
+      const base = Math.floor(totalXp / 4)
+      const remainder = totalXp % 4
+      expect(Object.values(activity.reward.pathXp)).toEqual(
+        [0, 1, 2, 3].map((index) => base + Number(index < remainder)),
+      )
+      expect(
+        Object.values(activity.reward.pathXp).reduce((sum, xp) => sum + xp, 0),
+      ).toBe(totalXp)
+      expect(isActivity(activity)).toBe(true)
+    }
+  })
+
+  it('rejects a policy that does not match its snapshot or a forged attribution', () => {
+    const session = weightedSession()
+    const activity = createActivity(session, allPerformed(session), 3_000)
+    expect(
+      isActivity({
+        ...activity,
+        reward: { ...activity.reward, policyVersion: 1 },
+      }),
+    ).toBe(false)
+    expect(
+      isActivity({
+        ...activity,
+        reward: { ...activity.reward, policyVersion: 3 },
+      }),
+    ).toBe(false)
+    const historical = completeActivity()
+    expect(
+      isActivity({
+        ...historical,
+        reward: { ...historical.reward, policyVersion: 2 },
+      }),
+    ).toBe(false)
+    activity.reward.pathXp.endurance -= 1
+    activity.reward.pathXp.strategy += 1
+    expect(isActivity(activity)).toBe(false)
+    delete session.snapshot.variant.phases[0].pathWeights
+    expect(() =>
+      createActivity(session, allPerformed(session), 3_000),
+    ).toThrow()
+  })
+
+  it('adds both policy versions to the same progression without rewriting either', () => {
+    const oldActivity = completeActivity(FIRST_WORKOUT.variants[1])
+    const session = weightedSession()
+    session.id = 'new-session'
+    const newActivity = createActivity(session, allPerformed(session), 3_000)
+    const activities = [oldActivity, newActivity]
+    const original = structuredClone(activities)
+
+    expect(getProgress(activities)).toEqual({
+      totalXp: 106,
+      pathXp: { power: 35, endurance: 32, technique: 37, strategy: 2 },
+      level: 2,
+      xpInLevel: 6,
+      xpToNextLevel: 94,
+      completedCount: 2,
+      partialCount: 0,
+    })
+    expect(activities).toEqual(original)
   })
 })
 

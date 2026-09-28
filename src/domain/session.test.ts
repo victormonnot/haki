@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FIRST_WORKOUT, MOVEMENTS } from '../content/workouts'
+import { FIRST_WORKOUT, MOVEMENTS, WORKOUTS } from '../content/workouts'
 import {
   createSessionDraft,
   getSessionDuration,
@@ -226,21 +226,93 @@ describe('restoreSessionDraft', () => {
 
 describe('isSessionDraft', () => {
   it('accepts every catalogue variant in both modes after a serialization round trip', () => {
-    for (const variant of FIRST_WORKOUT.variants) {
-      for (const mode of ['real', 'demo'] as const) {
-        const session = createSessionDraft(
-          FIRST_WORKOUT,
-          variant,
-          setup(),
-          MOVEMENTS,
-          mode,
-          'valid',
-          1_000,
-        )
-        expect(isSessionDraft(session)).toBe(true)
-        expect(isSessionDraft(JSON.parse(JSON.stringify(session)))).toBe(true)
+    for (const workout of WORKOUTS) {
+      for (const variant of workout.variants) {
+        for (const mode of ['real', 'demo'] as const) {
+          const session = createSessionDraft(
+            workout,
+            variant,
+            setup(),
+            MOVEMENTS,
+            mode,
+            'valid',
+            1_000,
+          )
+          expect(isSessionDraft(session)).toBe(true)
+          expect(isSessionDraft(JSON.parse(JSON.stringify(session)))).toBe(true)
+        }
       }
     }
+  })
+
+  it('accepts phase weights only when every non-rest phase is defined', () => {
+    const session = draft()
+    const phases = session.snapshot.variant.phases
+    const weights = { power: 0, endurance: 50, technique: 50, strategy: 0 }
+
+    phases[0].pathWeights = weights
+    expect(isSessionDraft(session)).toBe(false)
+    for (const phase of phases) {
+      if (phase.kind !== 'rest') phase.pathWeights = { ...weights }
+    }
+    expect(isSessionDraft(session)).toBe(true)
+    expect(isSessionDraft(JSON.parse(JSON.stringify(session)))).toBe(true)
+    delete phases.at(-1)!.pathWeights
+    expect(isSessionDraft(session)).toBe(false)
+  })
+
+  it.each([
+    null,
+    {},
+    { power: 0, endurance: 50, technique: 49, strategy: 0 },
+    { power: -1, endurance: 51, technique: 50, strategy: 0 },
+    { power: 0.5, endurance: 49.5, technique: 50, strategy: 0 },
+    { power: 0, endurance: 50, technique: 50, strategy: Infinity },
+    { power: 0, endurance: 50, technique: 50, strategy: 0, extra: 0 },
+  ])('rejects invalid weights on any phase, including rest: %j', (weights) => {
+    const session = draft()
+    for (const phase of session.snapshot.variant.phases) {
+      phase.pathWeights = {
+        power: 0,
+        endurance: 50,
+        technique: 50,
+        strategy: 0,
+      }
+    }
+    for (const phase of session.snapshot.variant.phases) {
+      const invalid = structuredClone(session)
+      const invalidPhase = invalid.snapshot.variant.phases.find(
+        ({ id }) => id === phase.id,
+      )!
+      Object.assign(invalidPhase, { pathWeights: weights })
+      expect(isSessionDraft(invalid)).toBe(false)
+    }
+  })
+
+  it('copies phase weights independently with the session snapshot', () => {
+    const variant = structuredClone(FIRST_WORKOUT.variants[0])
+    for (const phase of variant.phases) {
+      if (phase.kind !== 'rest')
+        phase.pathWeights = {
+          power: 0,
+          endurance: 50,
+          technique: 50,
+          strategy: 0,
+        }
+    }
+    const session = createSessionDraft(
+      FIRST_WORKOUT,
+      variant,
+      setup(),
+      MOVEMENTS,
+      'real',
+      'weighted',
+      1_000,
+    )
+    variant.phases[0].pathWeights!.endurance = 25
+
+    expect(session.snapshot.variant.phases[0].pathWeights!.endurance).toBe(50)
+    expect(isSessionDraft(session)).toBe(true)
   })
 
   it('accepts fractional elapsed time and exact completion in both modes', () => {

@@ -2,7 +2,7 @@
 
 Une application d’entraînement qui associe mouvement, guidage vocal et progression personnelle.
 
-HAKI permet de préparer **L’Éveil du Nord**, une première séance du parcours Viking, avec trois variantes de 8, 12 et 14 minutes. La sélection tient compte du lieu, du matériel, du temps disponible, de l’expérience, de l’espace et du bruit. Le déroulement et les consignes de chaque mouvement sont consultables avant l’entraînement.
+HAKI propose **L’appel du Nord**, un parcours Viking de six séances et treize variantes. **L’Éveil du Nord** ouvre deux branches, stabilité/technique et souffle/attention, qui se rejoignent dans une séance de synthèse. La première séance dure de 8 à 14 minutes selon la variante ; les cinq suivantes durent 12 minutes chacune. La sélection tient compte du lieu, du matériel, du temps disponible, de l’expérience, de l’espace et du bruit. Le déroulement et les consignes de chaque mouvement sont consultables avant l’entraînement.
 
 Les profils **Maison** et **Salle de boxe** sont modifiables et enregistrables sur l’appareil. Un test audio séparé de **60 secondes** permet d’essayer la voix française, le chronomètre et les interruptions, écran déverrouillé. Le maintien de l’écran allumé est demandé lorsque le navigateur le permet.
 
@@ -62,6 +62,25 @@ Ouvrir « Tester le guide », puis appuyer sur « Lancer le test audio ». Véri
 
 Les profils utilisent IndexedDB dans le navigateur courant. Ils ne sont pas synchronisés entre appareils ou entre adresses : HTTP, HTTPS et une autre IP possèdent des espaces de stockage distincts. En cas de stockage indisponible, la préparation reste utilisable et l’échec d’enregistrement est signalé. L’effacement des données du site supprime les profils.
 
+## Explorer le parcours Viking
+
+Ouvrir « Parcours Viking » ([aperçu local](http://localhost:5173/#parcours)). Chaque étape affiche son objectif, ses prérequis et les variantes acceptées. Le contenu des séances verrouillées reste consultable ; leur lecteur réel et leur aperçu accéléré deviennent disponibles après validation des prérequis.
+
+```text
+L’Éveil du Nord
+├── Le Socle de pierre → La Garde du rempart ─────┐
+└── Le Souffle du fjord → Les Signaux du guetteur ┤
+                                                └── La Traversée du Nord
+```
+
+Une seule variante acceptée suffit pour valider une étape : le minuteur doit être terminé et tous les blocs de mouvement confirmés en entier. Une activité partielle conserve son XP, mais ne débloque rien. L’aperçu accéléré ne crée aucune activité. Les séances accessibles peuvent être répétées ; il n’y a ni obligation quotidienne ni seuil d’XP imposé.
+
+Les variantes sans matériel permettent de parcourir tout le chapitre dans un espace réduit et sans sauts. Les variantes avec haltères, corde ou déplacement ample annoncent leurs contraintes sans substitution automatique. Les Signaux du guetteur proposent une réponse gauche/droite ou une association de mots à un geste, affichée et annoncée ; l’application ne mesure ni la réussite ni le temps de réaction.
+
+Les déblocages sont calculés depuis les activités confirmées, avec des règles explicites d’identifiant, de version et de variante. Les activités existantes de L’Éveil du Nord, version 1, restent reconnues. Les prérequis sont revérifiés à l’ouverture du lecteur. Si un prérequis disparaît des données, l’accès est recalculé pour toute sa branche ; les activités ultérieures et leur validation propre restent conservées.
+
+Pour vérifier la boucle : terminer L’Éveil du Nord, confirmer tous ses blocs, puis revenir au parcours. Les deux branches deviennent accessibles. Un bilan partiel n’a pas cet effet. La séance finale nécessite les deux branches complètes.
+
 ## Suivre une séance
 
 1. Préparer une variante compatible, ouvrir « Voir ma séance », puis « Ouvrir le lecteur ». Le lecteur enregistre le brouillon avant de proposer le départ.
@@ -84,7 +103,7 @@ La migration du stockage conserve les profils existants. Les données restent pr
 4. Vérifier le statut complet ou partiel et l’XP proposée, puis « Confirmer et enregistrer ». Les choix du formulaire ne sont pas enregistrés avant cette confirmation ; un rechargement avant validation demande de les saisir à nouveau.
 5. Retrouver le bilan et la progression dans « Mon carnet ». Recharger la page ou revisiter un bilan enregistré n’ajoute pas une seconde activité.
 
-Le barème actuel est versionné : **10 XP par minute de mouvement confirmé**, échauffement et retour au calme compris, arrondies à l’entier inférieur sur le total. Les récupérations, pauses et interruptions ne produisent pas d’XP. Le total est réparti selon les poids de la variante par la méthode des plus forts restes ; les égalités suivent l’ordre Puissant, Infatigable, Technicien, Stratège. La somme des voies est exactement égale à l’XP générale.
+Les barèmes sont versionnés : **10 XP par minute de mouvement confirmé**, échauffement et retour au calme compris, arrondies à l’entier inférieur sur le total. Les récupérations, pauses et interruptions ne produisent pas d’XP. La version 1, conservée pour L’Éveil du Nord et ses activités existantes, répartit le total selon les poids de la variante. La version 2 des cinq nouvelles séances pondère chaque voie par les secondes réellement confirmées de chaque bloc et par son orientation. Ainsi, un échauffement seul ne donne pas d’XP Stratège ; les blocs de réponse aux signaux doivent avoir été pratiqués et confirmés. Les deux versions utilisent la méthode des plus forts restes ; les égalités suivent l’ordre Puissant, Infatigable, Technicien, Stratège. La somme des voies est exactement égale à l’XP générale.
 
 Une séance est complète seulement si le minuteur est terminé et si tous les blocs de mouvement sont confirmés en entier. Toute autre déclaration valide reste partielle. Une déclaration d’une à cinq secondes peut être conservée avec 0 XP. Les niveaux commencent à 1 et progressent tous les 100 XP, sans perte liée à l’inactivité.
 
@@ -96,23 +115,24 @@ L’activité contient l’instantané de la séance, le réalisé et sa récomp
 
 « Mon carnet → Exporter mes données » prépare un fichier `haki-YYYY-MM-DD.json`. Le format `haki-backup`, version 1, inclut les activités, les profils effectivement enregistrés et le brouillon réel éventuel, lus dans une même transaction. Une donnée illisible bloque l’export au lieu de produire une sauvegarde silencieusement incomplète.
 
-L’aperçu accéléré n’ajoute ni activité ni XP et n’apparaît jamais dans l’export. L’import, la modification et la suppression des activités, le calendrier, les cours ajoutés manuellement et les déblocages de l’arbre ne sont pas encore disponibles. Conserver les fichiers exportés avant de vider les données du navigateur.
+L’aperçu accéléré n’ajoute ni activité ni XP et n’apparaît jamais dans l’export. L’import, la modification et la suppression des activités, le calendrier et les cours ajoutés manuellement ne sont pas encore disponibles. Conserver les fichiers exportés avant de vider les données du navigateur.
 
 ## Organisation
 
-- `src/content` : séance, variantes, phases et mouvements.
+- `src/content` : catalogue des séances, variantes, phases, mouvements et parcours Viking.
 - `src/domain` : compatibilité, chronomètre, instantanés de séance, validation du réalisé et règles d’XP, indépendants de l’interface.
 - `src/data` : profils, brouillon et activités, migrations, transactions IndexedDB et export cohérent.
+- `src/features/path` : arbre Viking, prérequis, états d’accès et de validation.
 - `src/features/preparation` : configuration, choix de variante et aperçu détaillé.
 - `src/features/sound-check` : essai de guidage audio et adaptateurs voix/écran.
 - `src/features/player` : lecteur, interruptions et points de reprise.
 - `src/features/progress` : bilan déclaré, carnet, progression et téléchargement de l’export.
 
-Les durées affichées sont calculées à partir des phases, échauffement et récupérations compris. Les pourcentages des voies décrivent l’orientation du contenu ; ils déterminent la répartition de l’XP confirmée, sans mesurer les capacités de la personne.
+Les durées affichées sont calculées à partir des phases, échauffement et récupérations compris. Les pourcentages des voies décrivent l’orientation du contenu ; ils représentent la séance complète. Pour les contenus au barème 2, un bilan partiel utilise uniquement l’orientation des blocs confirmés. Ces valeurs ne mesurent pas les capacités de la personne.
 
 ## Contenu d’entraînement
 
-Les séances proposées sont des compositions de démonstration non validées par un entraîneur. Les mouvements simples s’appuient sur les descriptions d’[échauffement du NHS](https://www.nhs.uk/live-well/exercise/how-to-warm-up-before-exercising/), les [exercices de renforcement du NHS](https://www.nhs.uk/live-well/exercise/strength-exercises/) et les repères de corde du [manuel England Boxing, niveau 2](https://www.englandboxing.org/wp-content/uploads/2022/03/Level-2-Coaching-Handbook-compressed.pdf). Ces sources ne valident ni les séquences ni les durées choisies ici.
+Les séances proposées sont des compositions de démonstration non validées par un entraîneur. Les mouvements simples s’appuient sur les descriptions d’[échauffement du NHS](https://www.nhs.uk/live-well/exercise/how-to-warm-up-before-exercising/), les [exercices de renforcement du NHS](https://www.nhs.uk/live-well/exercise/strength-exercises/) et les repères de corde du [manuel England Boxing, niveau 2](https://www.englandboxing.org/wp-content/uploads/2022/03/Level-2-Coaching-Handbook-compressed.pdf). Les variantes suivantes utilisent aussi les repères de [pas latéraux du NHS](https://www.nhs.uk/live-well/exercise/balance-exercises/), de [marche du NHS](https://www.nhs.uk/live-well/exercise/walking-for-health/) et de garde et déplacement du [manuel débutant de Boxing Canada](https://boxingcanada.org/wp-content/uploads/2025/01/Instruction-Beginners-Reference-Manual-EN.pdf), sections 5.1 et 5.2. Les séquences et les associations de signaux sont originales ; ces organismes ne valident ni le programme ni les durées choisies ici.
 
 ## Vérifications
 

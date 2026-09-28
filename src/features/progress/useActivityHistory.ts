@@ -33,7 +33,10 @@ export function useActivityHistory() {
       if (document.visibilityState === 'visible') void refresh()
     }
     const onNavigate = () => {
-      if (/^#(?:historique|bilan)/.test(window.location.hash)) void refresh()
+      if (
+        /^#(?:historique|bilan|parcours|preparation)/.test(window.location.hash)
+      )
+        void refresh()
     }
     window.addEventListener('focus', onVisible)
     window.addEventListener('hashchange', onNavigate)

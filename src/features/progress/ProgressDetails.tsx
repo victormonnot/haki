@@ -122,6 +122,10 @@ export function ActivityDetails({ activity }: { activity: Activity }) {
           <a className="progress-link" href="#preparation">
             Préparer une séance <ArrowRight size={17} aria-hidden="true" />
           </a>
+          <a className="progress-link" href="#parcours">
+            Retrouver le parcours Viking{' '}
+            <ArrowRight size={17} aria-hidden="true" />
+          </a>
         </div>
         <div>
           <RewardSplit activity={activity} />
@@ -136,6 +140,11 @@ export function ActivityDetails({ activity }: { activity: Activity }) {
             <p>
               Barème version {activity.reward.policyVersion}. Le contenu et la
               récompense sont conservés avec cette activité.
+            </p>
+            <p>
+              {activity.reward.policyVersion === 1
+                ? 'La répartition suit l’orientation de la variante.'
+                : 'La répartition suit les durées et l’orientation des blocs que tu as confirmés. Les blocs non réalisés ne contribuent à aucune voie.'}
             </p>
           </details>
         </div>

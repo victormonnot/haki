@@ -169,7 +169,7 @@ function isPhase(value: unknown): value is WorkoutPhase {
     !hasKeys(
       value,
       ['id', 'title', 'kind', 'durationSeconds', 'cue'],
-      ['movementId'],
+      ['movementId', 'pathWeights'],
     )
   ) {
     return false
@@ -184,7 +184,27 @@ function isPhase(value: unknown): value is WorkoutPhase {
     value.durationSeconds > 0 &&
     value.durationSeconds <= MAX_PHASE_SECONDS &&
     isText(value.cue) &&
-    (value.movementId === undefined || isText(value.movementId, MAX_ID_LENGTH))
+    (value.movementId === undefined ||
+      isText(value.movementId, MAX_ID_LENGTH)) &&
+    (value.pathWeights === undefined || isPathWeights(value.pathWeights))
+  )
+}
+
+function isPathWeights(value: unknown): value is WorkoutVariant['pathWeights'] {
+  return (
+    isRecord(value) &&
+    hasKeys(value, ['power', 'endurance', 'technique', 'strategy']) &&
+    Object.values(value).every(
+      (weight) =>
+        typeof weight === 'number' &&
+        Number.isInteger(weight) &&
+        weight >= 0 &&
+        weight <= 100,
+    ) &&
+    Object.values(value).reduce<number>(
+      (total, weight) => total + (weight as number),
+      0,
+    ) === 100
   )
 }
 
@@ -236,21 +256,14 @@ function isVariant(value: unknown): value is WorkoutVariant {
     return false
   }
 
-  const weights = value.pathWeights
+  const activePhases = phases.filter((phase) => phase.kind !== 'rest')
+  const hasPhaseWeights = activePhases.some(
+    (phase) => phase.pathWeights !== undefined,
+  )
   return (
-    isRecord(weights) &&
-    hasKeys(weights, ['power', 'endurance', 'technique', 'strategy']) &&
-    Object.values(weights).every(
-      (weight) =>
-        typeof weight === 'number' &&
-        Number.isInteger(weight) &&
-        weight >= 0 &&
-        weight <= 100,
-    ) &&
-    Object.values(weights).reduce<number>(
-      (total, weight) => total + (weight as number),
-      0,
-    ) === 100
+    isPathWeights(value.pathWeights) &&
+    (!hasPhaseWeights ||
+      activePhases.every((phase) => phase.pathWeights !== undefined))
   )
 }
 

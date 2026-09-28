@@ -14,6 +14,11 @@ export const REWARD_POLICY_V1 = {
   xpPerLevel: 100,
 } as const
 
+export const REWARD_POLICY_V2 = {
+  ...REWARD_POLICY_V1,
+  policyVersion: 2,
+} as const
+
 export const PATHS = [
   { id: 'power', label: 'Le Puissant' },
   { id: 'endurance', label: 'L’Infatigable' },
@@ -38,7 +43,7 @@ export interface Activity {
     status: 'completed' | 'partial'
   }
   reward: {
-    policyVersion: 1
+    policyVersion: 1 | 2
     xpPerMinute: 10
     xpPerLevel: 100
     totalXp: number
@@ -69,12 +74,13 @@ export function getReportablePhases(
 function distributeXp(
   totalXp: number,
   weights: Record<PathId, number>,
+  totalWeight = 100,
 ): Record<PathId, number> {
   const pathXp = emptyPathXp()
   const remainders = PATHS.map(({ id }, index) => {
     const weightedXp = totalXp * weights[id]
-    pathXp[id] = Math.floor(weightedXp / 100)
-    return { id, index, remainder: weightedXp % 100 }
+    pathXp[id] = Math.floor(weightedXp / totalWeight)
+    return { id, index, remainder: weightedXp % totalWeight }
   }).sort(
     (left, right) =>
       right.remainder - left.remainder || left.index - right.index,
@@ -181,9 +187,21 @@ export function createActivity(
       ({ phase, availableSeconds }) =>
         performed.get(phase.id) === availableSeconds,
     )
-  const totalXp = Math.floor(
-    (performedSeconds * REWARD_POLICY_V1.xpPerMinute) / 60,
+  const usesPhaseWeights = reportable.every(
+    ({ phase }) => phase.pathWeights !== undefined,
   )
+  const policy = usesPhaseWeights ? REWARD_POLICY_V2 : REWARD_POLICY_V1
+  const totalXp = Math.floor((performedSeconds * policy.xpPerMinute) / 60)
+  const weights = usesPhaseWeights
+    ? emptyPathXp()
+    : session.snapshot.variant.pathWeights
+  if (usesPhaseWeights) {
+    for (const { phase } of reportable) {
+      for (const { id } of PATHS) {
+        weights[id] += performed.get(phase.id)! * phase.pathWeights![id]
+      }
+    }
+  }
 
   return {
     schemaVersion: 1,
@@ -197,9 +215,13 @@ export function createActivity(
       status: completed ? 'completed' : 'partial',
     },
     reward: {
-      ...REWARD_POLICY_V1,
+      ...policy,
       totalXp,
-      pathXp: distributeXp(totalXp, session.snapshot.variant.pathWeights),
+      pathXp: distributeXp(
+        totalXp,
+        weights,
+        usesPhaseWeights ? performedSeconds * 100 : 100,
+      ),
     },
   }
 }
@@ -257,7 +279,7 @@ export function isActivity(value: unknown): value is Activity {
       'totalXp',
       'pathXp',
     ]) ||
-    value.reward.policyVersion !== 1 ||
+    (value.reward.policyVersion !== 1 && value.reward.policyVersion !== 2) ||
     value.reward.xpPerMinute !== 10 ||
     value.reward.xpPerLevel !== 100 ||
     !isRecord(value.reward.pathXp) ||
@@ -280,6 +302,7 @@ export function isActivity(value: unknown): value is Activity {
       value.id === expected.id &&
       value.result.performedSeconds === expected.result.performedSeconds &&
       value.result.status === expected.result.status &&
+      value.reward.policyVersion === expected.reward.policyVersion &&
       value.reward.totalXp === expected.reward.totalXp &&
       PATHS.every(({ id }) => storedPathXp[id] === expected.reward.pathXp[id])
     )

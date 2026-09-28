@@ -1,5 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
-import { Compass, Headphones, Play, NotebookPen } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Compass, Headphones, Play, NotebookPen, GitBranch } from 'lucide-react'
+import { FIRST_WORKOUT, getWorkout } from './content/workouts'
+import { VIKING_PATH } from './content/vikingPath'
+import { derivePathProgress } from './domain/trainingPath'
+import PathScreen from './features/path/PathScreen'
 import SoundCheckScreen from './features/sound-check/SoundCheckScreen'
 import PreparationScreen from './features/preparation/PreparationScreen'
 import WorkoutPlayer, {
@@ -15,17 +19,35 @@ import { useActivityHistory } from './features/progress/useActivityHistory'
 import './App.css'
 
 function currentScreen(hash: string) {
+  if (hash === '#parcours') return 'path'
   if (hash.startsWith('#historique')) return 'history'
   if (hash.startsWith('#bilan/')) return 'report'
   if (hash === '#session') return 'session'
   return ['#guide', '#sound-check'].includes(hash) ? 'guide' : 'preparation'
 }
 
+function workoutIdFromHash(hash: string) {
+  if (!hash.startsWith('#preparation/')) return FIRST_WORKOUT.id
+  try {
+    return decodeURIComponent(hash.slice('#preparation/'.length))
+  } catch {
+    return ''
+  }
+}
+
 function App() {
   const [hash, setHash] = useState(window.location.hash)
+  const [workoutId, setWorkoutId] = useState(() =>
+    workoutIdFromHash(window.location.hash),
+  )
+  const workout = getWorkout(workoutId)
   const screen = currentScreen(hash)
   const previousScreen = useRef(hash)
   const history = useActivityHistory()
+  const pathProgress = useMemo(
+    () => derivePathProgress(VIKING_PATH, history.activities),
+    [history.activities],
+  )
   let activityId = ''
   try {
     activityId = decodeURIComponent(hash.split('/').slice(1).join('/'))
@@ -49,7 +71,11 @@ function App() {
   }, [finalizedDraftId, reconcileFinalized, busy, saving])
 
   useEffect(() => {
-    const onHashChange = () => setHash(window.location.hash)
+    const onHashChange = () => {
+      const next = window.location.hash
+      setHash(next)
+      if (next.startsWith('#preparation')) setWorkoutId(workoutIdFromHash(next))
+    }
     window.addEventListener('hashchange', onHashChange)
     return () => window.removeEventListener('hashchange', onHashChange)
   }, [])
@@ -101,7 +127,18 @@ function App() {
         </a>
         <nav className="main-navigation" aria-label="Navigation principale">
           <a
-            href="#preparation"
+            href="#parcours"
+            aria-current={screen === 'path' ? 'page' : undefined}
+          >
+            <GitBranch size={16} aria-hidden="true" />
+            <span>Parcours Viking</span>
+          </a>
+          <a
+            href={
+              workoutId === FIRST_WORKOUT.id
+                ? '#preparation'
+                : `#preparation/${workoutId}`
+            }
             aria-current={screen === 'preparation' ? 'page' : undefined}
           >
             <Compass size={16} aria-hidden="true" />
@@ -137,11 +174,29 @@ function App() {
         <ProgressTeaser history={history} />
         <SessionRecovery session={session} />
         <SessionNotice session={session} />
-        <PreparationScreen
-          active={screen === 'preparation'}
-          session={session}
-        />
+        {workout ? (
+          <PreparationScreen
+            active={screen === 'preparation'}
+            session={session}
+            workout={workout}
+            progress={pathProgress}
+            history={history}
+          />
+        ) : (
+          <main
+            id={screen === 'preparation' ? 'main-content' : undefined}
+            className="progress-screen"
+            tabIndex={-1}
+          >
+            <h1>Séance introuvable.</h1>
+            <p>Ce lien ne correspond à aucune séance du catalogue.</p>
+            <a href="#parcours">Retrouver le parcours Viking</a>
+          </main>
+        )}
       </div>
+      {screen === 'path' && (
+        <PathScreen progress={pathProgress} history={history} />
+      )}
       {screen === 'session' && <WorkoutPlayer session={session} />}
       {screen === 'history' && (
         <HistoryScreen history={history} activityId={activityId} />
@@ -153,7 +208,15 @@ function App() {
           sessionId={activityId}
         />
       )}
-      {screen === 'guide' && <SoundCheckScreen />}
+      {screen === 'guide' && (
+        <SoundCheckScreen
+          preparationHref={
+            workoutId === FIRST_WORKOUT.id
+              ? '#preparation'
+              : `#preparation/${encodeURIComponent(workoutId)}`
+          }
+        />
+      )}
       <footer>
         <span>
           HAKI<span className="brand-period">.</span>

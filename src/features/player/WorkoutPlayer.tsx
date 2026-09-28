@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { FIRST_WORKOUT } from '../../content/workouts'
 import {
   ArrowLeft,
   ArrowRight,
@@ -15,7 +16,11 @@ import {
   getSessionPosition,
   type SessionMode,
 } from '../../domain/session'
-import type { TrainingSetup, WorkoutVariant } from '../../domain/workouts'
+import type {
+  TrainingSetup,
+  Workout,
+  WorkoutVariant,
+} from '../../domain/workouts'
 import { durationLabel } from '../preparation/durationLabel'
 import { useWakeLock } from '../sound-check/useWakeLock'
 import type { WorkoutSessionController } from './useWorkoutSession'
@@ -121,15 +126,19 @@ export function SessionNotice({
 
 export function SessionPreparationActions({
   session,
+  workout,
+  accessible,
   variant,
   setup,
 }: {
   session: WorkoutSessionController
+  workout: Workout
+  accessible: boolean
   variant: WorkoutVariant
   setup: TrainingSetup
 }) {
   async function open(mode: SessionMode) {
-    if (await session.open(variant, setup, mode))
+    if (await session.open(workout.id, variant.id, setup, mode))
       window.location.hash = 'session'
   }
   return (
@@ -144,6 +153,7 @@ export function SessionPreparationActions({
         <button
           className="prepare-button"
           disabled={
+            !accessible ||
             session.loading ||
             session.busy ||
             !!session.realDraft ||
@@ -161,7 +171,7 @@ export function SessionPreparationActions({
         )}
         <button
           className="session-text-button"
-          disabled={session.loading || session.busy}
+          disabled={!accessible || session.loading || session.busy}
           onClick={() => void open('demo')}
         >
           Essayer en accéléré
@@ -170,6 +180,7 @@ export function SessionPreparationActions({
           Aperçu : 5 secondes par étape, sans exercice à faire. Il disparaît au
           rechargement.
         </p>
+        {session.launchError && <p role="alert">{session.launchError}</p>}
         <a className="session-text-button" href="#guide">
           Tester le guide audio
         </a>
@@ -233,6 +244,10 @@ export default function WorkoutPlayer({
       </main>
     )
   const position = getSessionPosition(draft)
+  const preparationHref =
+    draft.snapshot.workoutId === FIRST_WORKOUT.id
+      ? '#preparation'
+      : `#preparation/${encodeURIComponent(draft.snapshot.workoutId)}`
   const phase = position.phase
   const next = draft.snapshot.variant.phases[position.phaseIndex + 1]
   const movement = phase?.movementId
@@ -248,7 +263,7 @@ export default function WorkoutPlayer({
   }
   return (
     <main id="main-content" tabIndex={-1} className="workout-screen">
-      <a href="#preparation" className="back-button">
+      <a href={preparationHref} className="back-button">
         <ArrowLeft size={17} aria-hidden="true" /> Ma préparation
       </a>
       <div className="workout-heading">
@@ -387,7 +402,7 @@ export default function WorkoutPlayer({
           )}
           {terminal &&
             (demo ? (
-              <a className="primary-button" href="#preparation">
+              <a className="primary-button" href={preparationHref}>
                 Retour à ma préparation
               </a>
             ) : (
@@ -515,7 +530,7 @@ export default function WorkoutPlayer({
               void session.discard().then((done) => {
                 if (done) {
                   setConfirmation(null)
-                  window.location.hash = 'preparation'
+                  window.location.hash = preparationHref
                 }
               })
           }}

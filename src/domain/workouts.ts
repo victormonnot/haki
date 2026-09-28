@@ -38,6 +38,7 @@ export interface WorkoutPhase {
   durationSeconds: number
   movementId?: string
   cue: string
+  pathWeights?: WorkoutVariant['pathWeights']
 }
 
 export interface WorkoutVariant {

@@ -1,4 +1,5 @@
 import { isTrainingSetup, type TrainingSetup } from '../domain/workouts'
+import { openDatabase, TRAINING_PROFILES_STORE } from './database'
 
 export type ProfileId = 'home' | 'gym'
 
@@ -36,9 +37,7 @@ export const DEFAULT_PROFILES: Record<ProfileId, TrainingProfile> = {
 }
 
 const PROFILE_IDS: ProfileId[] = ['home', 'gym']
-const DATABASE_NAME = 'haki'
-const DATABASE_VERSION = 1
-const STORE_NAME = 'training-profiles'
+const STORE_NAME = TRAINING_PROFILES_STORE
 const SCHEMA_VERSION = 1
 
 interface StoredTrainingProfile extends TrainingProfile {
@@ -76,59 +75,6 @@ function isStoredProfile(
     record.name.length <= 80 &&
     isTrainingSetup(record.setup)
   )
-}
-
-function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') {
-      reject(
-        new Error('Le stockage local est indisponible dans ce navigateur.'),
-      )
-      return
-    }
-
-    let request: IDBOpenDBRequest
-    try {
-      request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION)
-    } catch (cause) {
-      reject(new Error('Impossible d’ouvrir le stockage local.', { cause }))
-      return
-    }
-
-    let settled = false
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-        request.result.createObjectStore(STORE_NAME, { keyPath: 'id' })
-      }
-    }
-    request.onerror = () => {
-      if (settled) return
-      settled = true
-      reject(
-        new Error('Impossible d’ouvrir le stockage local.', {
-          cause: request.error,
-        }),
-      )
-    }
-    request.onblocked = () => {
-      if (settled) return
-      settled = true
-      reject(
-        new Error('Le stockage local est occupé par un autre onglet HAKI.'),
-      )
-    }
-    request.onsuccess = () => {
-      const database = request.result
-      if (settled) {
-        database.close()
-        return
-      }
-
-      settled = true
-      database.onversionchange = () => database.close()
-      resolve(database)
-    }
-  })
 }
 
 export async function loadTrainingProfiles(): Promise<{

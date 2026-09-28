@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Clock3,
   Dumbbell,
-  Headphones,
   Home,
   Info,
   MapPin,
@@ -33,6 +32,8 @@ import type { ProfileId } from '../../data/trainingProfiles'
 import { useTrainingProfiles } from './useTrainingProfiles'
 import { durationLabel } from './durationLabel'
 import { MovementGuide, PhaseSummary, WorkoutTimeline } from './WorkoutDetails'
+import { SessionPreparationActions } from '../player/WorkoutPlayer'
+import type { WorkoutSessionController } from '../player/useWorkoutSession'
 import './preparation.css'
 
 const PATHS = [
@@ -62,7 +63,13 @@ function ContentNote() {
   )
 }
 
-function PreparationScreen({ active }: { active: boolean }) {
+function PreparationScreen({
+  active,
+  session,
+}: {
+  active: boolean
+  session: WorkoutSessionController
+}) {
   const { profiles, loading, saving, error, saveProfile } =
     useTrainingProfiles()
   const [profileId, setProfileId] = useState<ProfileId>('home')
@@ -171,18 +178,11 @@ function PreparationScreen({ active }: { active: boolean }) {
           </div>
           <aside className="prepared-sidebar">
             <MovementGuide variant={prepared.variant} />
-            <div className="guide-callout">
-              <Headphones size={23} aria-hidden="true" />
-              <h3>Fais connaissance avec ta voix.</h3>
-              <p>
-                Le test du guide dure une minute. Le guidage de cette séance
-                sera disponible prochainement.
-              </p>
-              <a href="#guide">
-                Tester le guide audio{' '}
-                <ArrowRight size={17} aria-hidden="true" />
-              </a>
-            </div>
+            <SessionPreparationActions
+              session={session}
+              variant={prepared.variant}
+              setup={prepared.setup}
+            />
             <ContentNote />
           </aside>
         </div>

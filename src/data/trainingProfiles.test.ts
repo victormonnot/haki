@@ -12,7 +12,7 @@ const STORE_NAME = 'training-profiles'
 
 function openRawDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('haki', 1)
+    const request = indexedDB.open('haki')
     request.onupgradeneeded = () => {
       request.result.createObjectStore(STORE_NAME, { keyPath: 'id' })
     }

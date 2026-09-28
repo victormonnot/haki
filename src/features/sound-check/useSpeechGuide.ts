@@ -19,7 +19,7 @@ function preferredFrenchVoice(voices: SpeechSynthesisVoice[]) {
 function speechErrorMessage(error: SpeechSynthesisErrorCode) {
   switch (error) {
     case 'not-allowed':
-      return 'Mets le test en pause, puis reprends-le pour réessayer la voix.'
+      return 'Mets en pause, puis reprends pour réessayer la voix.'
     case 'audio-busy':
     case 'audio-hardware':
       return 'Le son est indisponible. Vérifie la sortie audio, puis réessaie.'

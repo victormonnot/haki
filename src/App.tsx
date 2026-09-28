@@ -1,10 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
-import { Compass, Headphones } from 'lucide-react'
+import { Compass, Headphones, Play } from 'lucide-react'
 import SoundCheckScreen from './features/sound-check/SoundCheckScreen'
 import PreparationScreen from './features/preparation/PreparationScreen'
+import WorkoutPlayer, {
+  SessionNotice,
+  SessionRecovery,
+} from './features/player/WorkoutPlayer'
+import { useWorkoutSession } from './features/player/useWorkoutSession'
 import './App.css'
 
 function currentScreen() {
+  if (window.location.hash === '#session') return 'session'
   return ['#guide', '#sound-check'].includes(window.location.hash)
     ? 'guide'
     : 'preparation'
@@ -13,6 +19,7 @@ function currentScreen() {
 function App() {
   const [screen, setScreen] = useState(currentScreen)
   const previousScreen = useRef(screen)
+  const session = useWorkoutSession(screen === 'session')
 
   useEffect(() => {
     const onHashChange = () => setScreen(currentScreen())
@@ -80,12 +87,27 @@ function App() {
             <Headphones size={16} aria-hidden="true" />
             <span>Tester le guide</span>
           </a>
+          {session.draft && (
+            <a
+              href="#session"
+              aria-current={screen === 'session' ? 'page' : undefined}
+            >
+              <Play size={16} aria-hidden="true" />
+              <span>Ma séance</span>
+            </a>
+          )}
         </nav>
         <span className="edition">ÉDITION ORIGINE</span>
       </header>
       <div hidden={screen !== 'preparation'}>
-        <PreparationScreen active={screen === 'preparation'} />
+        <SessionRecovery session={session} />
+        <SessionNotice session={session} />
+        <PreparationScreen
+          active={screen === 'preparation'}
+          session={session}
+        />
       </div>
+      {screen === 'session' && <WorkoutPlayer session={session} />}
       {screen === 'guide' && <SoundCheckScreen />}
       <footer>
         <span>
